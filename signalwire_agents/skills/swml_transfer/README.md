@@ -15,6 +15,7 @@ The SWML Transfer skill provides a flexible way to implement call transfers betw
 - **Dynamic URL support** - Transfer to any URL endpoint
 - **Fallback handling** - Default behavior when no pattern matches
 - **Automatic prompt sections** - Adds "Transferring" section listing all configured destinations
+- **Required fields collection** - Collect any required data before transfer
 
 ## Requirements
 
@@ -35,6 +36,7 @@ The SWML Transfer skill provides a flexible way to implement call transfers betw
 - `parameter_description` (default: "The type of transfer to perform"): Parameter description
 - `default_message` (default: "Please specify a valid transfer type."): Message when no pattern matches
 - `default_post_process` (default: False): Post-processing flag for default case
+- `required_fields` (default: {}): Object mapping field names to descriptions for data collection
 
 ### Transfer Configuration
 
@@ -141,6 +143,26 @@ self.add_skill("swml_transfer", {
         }
     }
 })
+
+# With required fields collection
+self.add_skill("swml_transfer", {
+    "tool_name": "transfer_with_data",
+    "required_fields": {
+        "summary": "Summary of the conversation",
+        "customer_name": "Customer's full name",
+        "issue_type": "Type of issue (technical/billing/general)"
+    },
+    "transfers": {
+        "/sales/i": {
+            "url": "https://example.com/sales",
+            "message": "I'll transfer you to sales with your information."
+        },
+        "/support/i": {
+            "url": "https://example.com/support",
+            "message": "I'll transfer you to support with your information."
+        }
+    }
+})
 ```
 
 ## Generated Functions
@@ -151,12 +173,14 @@ The skill generates a single SWAIG function with the configured name:
 
 **Parameters:**
 - `transfer_type` (or custom `parameter_name`): String parameter that will be matched against configured patterns
+- Additional parameters defined in `required_fields` configuration
 
 **Behavior:**
 1. Takes the input parameter value
 2. Matches it against configured regex patterns in order
-3. If a match is found, transfers to the corresponding URL with configured messages
-4. If no match is found, returns the default message
+3. If `required_fields` are configured, saves all field values to `global_data.call_data`
+4. If a match is found, transfers to the corresponding URL with configured messages
+5. If no match is found, returns the default message (data still saved if provided)
 
 ## Prompt Sections
 
@@ -208,6 +232,16 @@ System: "I'll connect you with our sales team for pricing and billing questions.
 User: "Transfer me to the CEO"
 Agent: [Uses transfer_to_department("CEO")]
 System: "I can transfer you to sales, support, or a manager. Which would you prefer?"
+```
+
+### Example 4: Transfer with Required Fields
+```
+User: "I need to speak with support about my PC that won't boot"
+Agent: "I'll transfer you to support. Let me collect some information first."
+Agent: [Uses transfer_with_data("support", "Customer experiencing boot failure with their PC. Initial troubleshooting not yet performed.", "John Smith", "technical")]
+System: "I'll transfer you to support with your information."
+[Transfer occurs with data saved to global_data.call_data]
+Support Agent: [Can access the data via ${global_data.call_data.summary}, ${global_data.call_data.customer_name}, etc.]
 ```
 
 ## Troubleshooting

@@ -680,8 +680,9 @@ def handle_dump_swml(agent: 'AgentBase', args: argparse.Namespace) -> int:
                 print(f"Skills: {', '.join(skills)}")
                 
             # Show available functions
-            if hasattr(agent, '_swaig_functions') and agent._swaig_functions:
-                print(f"Functions: {', '.join(agent._swaig_functions.keys())}")
+            functions = agent._tool_registry.get_all_functions() if hasattr(agent, '_tool_registry') else {}
+            if functions:
+                print(f"Functions: {', '.join(functions.keys())}")
             
             print("-" * 60)
     
@@ -739,6 +740,9 @@ def handle_dump_swml(agent: 'AgentBase', args: argparse.Namespace) -> int:
             print(f"Mock request query params: {dict(mock_request.query_params.items())}")
             print(f"Mock request method: {mock_request.method}")
             print("-" * 60)
+        
+        # Apply dynamic configuration with the mock request
+        apply_dynamic_config(agent, mock_request, verbose=args.verbose and not args.raw)
         
         # For dynamic agents, call on_swml_request if available
         if hasattr(agent, 'on_swml_request'):
@@ -1523,8 +1527,15 @@ def display_agent_tools(agent: 'AgentBase', verbose: bool = False) -> None:
         verbose: Whether to show verbose details
     """
     print("\nAvailable SWAIG functions:")
-    if hasattr(agent, '_swaig_functions') and agent._swaig_functions:
-        for name, func in agent._swaig_functions.items():
+    # Try to access functions from the tool registry
+    functions = {}
+    if hasattr(agent, '_tool_registry') and hasattr(agent._tool_registry, '_swaig_functions'):
+        functions = agent._tool_registry._swaig_functions
+    elif hasattr(agent, '_swaig_functions'):
+        functions = agent._swaig_functions
+    
+    if functions:
+        for name, func in functions.items():
             if isinstance(func, dict):
                 # DataMap function
                 description = func.get('description', 'DataMap function (serverless)')
@@ -1830,6 +1841,48 @@ def load_agent_from_file(agent_path: str, agent_class_name: Optional[str] = None
                         f"Make sure the file contains an agent variable or AgentBase subclass.")
     
     return agent
+
+
+def apply_dynamic_config(agent: 'AgentBase', mock_request: Optional['MockRequest'] = None, verbose: bool = False) -> None:
+    """
+    Apply dynamic configuration callback if the agent has one
+    
+    Args:
+        agent: The agent instance
+        mock_request: Optional mock request object
+        verbose: Whether to print verbose output
+    """
+    # Check if agent has dynamic config callback
+    if hasattr(agent, '_dynamic_config_callback') and agent._dynamic_config_callback:
+        try:
+            # Create mock request data if not provided
+            if mock_request is None:
+                mock_request = create_mock_request()
+            
+            # Extract request data
+            query_params = dict(mock_request.query_params)
+            body_params = {}  # Empty for GET requests
+            headers = dict(mock_request.headers)
+            
+            if verbose:
+                print("Applying dynamic configuration callback...")
+            
+            # Call the user's configuration callback directly with the agent
+            # This is what pc_builder_service.py expects - to get the agent itself
+            agent._dynamic_config_callback(query_params, body_params, headers, agent)
+            
+            if verbose:
+                print("Dynamic configuration callback applied successfully")
+                # Show loaded skills after dynamic config
+                skills = agent.list_skills()
+                if skills:
+                    print(f"Skills loaded by dynamic config: {', '.join(skills)}")
+                
+        except Exception as e:
+            if verbose:
+                print(f"Warning: Failed to apply dynamic configuration: {e}")
+                import traceback
+                traceback.print_exc()
 
 
 def format_result(result: Any) -> str:
@@ -2585,6 +2638,9 @@ Examples:
                                 print(f"Warning: Cannot instantiate agent to show tools")
                                 return 0
                         
+                        # Apply dynamic configuration before showing tools
+                        apply_dynamic_config(selected_agent, verbose=args.verbose)
+                        
                         display_agent_tools(selected_agent, args.verbose)
                     except Exception as e:
                         print(f"Warning: Could not load agent tools: {e}")
@@ -2637,6 +2693,9 @@ Examples:
             else:
                 print("No skills loaded")
         
+        # Apply dynamic configuration if the agent has it
+        apply_dynamic_config(agent, verbose=args.verbose)
+        
         # List tools if requested
         if args.list_tools:
             display_agent_tools(agent, args.verbose)
@@ -2649,12 +2708,14 @@ Examples:
         # Parse function arguments
         if function_args_list:
             # Using --exec syntax, need to get the function to parse arguments with schema
-            if not hasattr(agent, '_swaig_functions') or args.tool_name not in agent._swaig_functions:
+            # Check tool registry for functions
+            functions = agent._tool_registry.get_all_functions() if hasattr(agent, '_tool_registry') else {}
+            if args.tool_name not in functions:
                 print(f"Error: Function '{args.tool_name}' not found in agent")
-                print(f"Available functions: {list(agent._swaig_functions.keys()) if hasattr(agent, '_swaig_functions') else 'None'}")
+                print(f"Available functions: {list(functions.keys()) if functions else 'None'}")
                 return 1
             
-            func = agent._swaig_functions[args.tool_name]
+            func = functions[args.tool_name]
             
             try:
                 function_args = parse_function_arguments(function_args_list, func)
@@ -2682,15 +2743,17 @@ Examples:
         
         # Check if the function exists (if not already checked)
         if not function_args_list:
-            if not hasattr(agent, '_swaig_functions') or args.tool_name not in agent._swaig_functions:
+            # Check tool registry for functions
+            functions = agent._tool_registry.get_all_functions() if hasattr(agent, '_tool_registry') else {}
+            if args.tool_name not in functions:
                 print(f"Error: Function '{args.tool_name}' not found in agent")
-                print(f"Available functions: {list(agent._swaig_functions.keys()) if hasattr(agent, '_swaig_functions') else 'None'}")
+                print(f"Available functions: {list(functions.keys()) if functions else 'None'}")
                 return 1
             
-            func = agent._swaig_functions[args.tool_name]
+            func = functions[args.tool_name]
         else:
             # Function already retrieved during argument parsing
-            func = agent._swaig_functions[args.tool_name]
+            func = functions[args.tool_name]
         
         # Determine function type automatically - no --datamap flag needed
         # DataMap functions are stored as dicts with 'data_map' key, webhook functions as SWAIGFunction objects

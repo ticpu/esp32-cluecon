@@ -75,6 +75,9 @@ class SWMLTransferSkill(SkillBase):
         self.default_message = self.params.get('default_message', 'Please specify a valid transfer type.')
         self.default_post_process = self.params.get('default_post_process', False)
         
+        # Required fields configuration
+        self.required_fields = self.params.get('required_fields', {})
+        
         return True
     
     def register_tools(self) -> None:
@@ -86,13 +89,34 @@ class SWMLTransferSkill(SkillBase):
             .parameter(self.parameter_name, 'string', self.parameter_description, required=True)
         )
         
+        # Add required fields as parameters
+        for field_name, field_description in self.required_fields.items():
+            transfer_tool = transfer_tool.parameter(
+                field_name, 
+                'string', 
+                field_description, 
+                required=True
+            )
+        
         # Add expression for each pattern
         for pattern, config in self.transfers.items():
             # Create the function result with transfer
             result = SwaigFunctionResult(
                 config['message'], 
                 post_process=config['post_process']
-            ).swml_transfer(
+            )
+            
+            # Add required fields to global data under call_data key
+            if self.required_fields:
+                call_data = {}
+                for field_name in self.required_fields.keys():
+                    call_data[field_name] = f"${{args.{field_name}}}"
+                result = result.update_global_data({
+                    "call_data": call_data
+                })
+            
+            # Add the transfer action
+            result = result.swml_transfer(
                 config['url'], 
                 config['return_message']
             )
@@ -109,6 +133,16 @@ class SWMLTransferSkill(SkillBase):
             self.default_message,
             post_process=self.default_post_process
         )
+        
+        # For fallback, still save required fields if provided
+        if self.required_fields:
+            call_data = {}
+            for field_name in self.required_fields.keys():
+                call_data[field_name] = f"${{args.{field_name}}}"
+            default_result = default_result.update_global_data({
+                "call_data": call_data
+            })
+        
         transfer_tool = transfer_tool.expression(
             f'${{{f"args.{self.parameter_name}"}}}',
             r'/.*/',  # Match anything as fallback
@@ -176,15 +210,27 @@ class SWMLTransferSkill(SkillBase):
             })
             
             # Add usage instructions
+            bullets = [
+                f"Use the {self.tool_name} function when a transfer is needed",
+                f"Pass the destination type to the '{self.parameter_name}' parameter"
+            ]
+            
+            # Add required fields instructions if configured
+            if self.required_fields:
+                bullets.append("You must provide the following information before transferring:")
+                for field_name, field_description in self.required_fields.items():
+                    bullets.append(f"  - {field_name}: {field_description}")
+                bullets.append("All required information will be saved under 'call_data' for the next agent")
+            
+            bullets.extend([
+                f"The system will match patterns and handle the transfer automatically",
+                "After transfer completes, you'll regain control of the conversation"
+            ])
+            
             sections.append({
                 "title": "Transfer Instructions",
                 "body": f"How to use the transfer capability:",
-                "bullets": [
-                    f"Use the {self.tool_name} function when a transfer is needed",
-                    f"Pass the destination type to the '{self.parameter_name}' parameter",
-                    f"The system will match patterns and handle the transfer automatically",
-                    "After transfer completes, you'll regain control of the conversation"
-                ]
+                "bullets": bullets
             })
         
         return sections

@@ -173,9 +173,10 @@ Transfer calls between agents using pattern matching.
     - `post_process` (optional, default: True): Enable post-processing
 - `default_message` (default: "Please specify a valid transfer type.") - Message when no pattern matches
 - `default_post_process` (default: False) - Post-processing flag for default case
+- `required_fields` (default: {}) - Object mapping field names to descriptions for data collection before transfer
 
 **Tools provided:**
-- `transfer_call(transfer_type)` (or custom tool_name) - Transfer based on pattern matching
+- `transfer_call(transfer_type, ...required_fields)` (or custom tool_name) - Transfer based on pattern matching with optional required fields
 
 **Usage examples:**
 ```python

@@ -251,8 +251,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"set_global_data": data}
-        return self.add_action("set_global_data", action)
+        return self.add_action("set_global_data", data)
 
     def execute_swml(self, swml_content, transfer: bool = False) -> 'SwaigFunctionResult':
         """
@@ -294,8 +293,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"hangup": True}
-        return self.add_action("hangup", action)
+        return self.add_action("hangup", True)
 
     def hold(self, timeout: int = 300) -> 'SwaigFunctionResult':
         """
@@ -309,8 +307,7 @@ class SwaigFunctionResult:
         """
         # Clamp timeout to valid range
         timeout = max(0, min(timeout, 900))
-        action = {"hold": timeout}
-        return self.add_action("hold", action)
+        return self.add_action("hold", timeout)
 
     def wait_for_user(self, enabled: Optional[bool] = None, timeout: Optional[int] = None, answer_first: bool = False) -> 'SwaigFunctionResult':
         """
@@ -333,8 +330,7 @@ class SwaigFunctionResult:
         else:
             wait_value = True
             
-        action = {"wait_for_user": wait_value}
-        return self.add_action("wait_for_user", action)
+        return self.add_action("wait_for_user", wait_value)
 
     def stop(self) -> 'SwaigFunctionResult':
         """
@@ -343,8 +339,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"stop": True}
-        return self.add_action("stop", action)
+        return self.add_action("stop", True)
 
     def say(self, text: str) -> 'SwaigFunctionResult':
         """
@@ -356,8 +351,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"say": text}
-        return self.add_action("say", action)
+        return self.add_action("say", text)
 
     def play_background_file(self, filename: str, wait: bool = False) -> 'SwaigFunctionResult':
         """
@@ -395,8 +389,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"end_of_speech_timeout": milliseconds}
-        return self.add_action("end_of_speech_timeout", action)
+        return self.add_action("end_of_speech_timeout", milliseconds)
 
     def set_speech_event_timeout(self, milliseconds: int) -> 'SwaigFunctionResult':
         """
@@ -409,8 +402,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"speech_event_timeout": milliseconds}
-        return self.add_action("speech_event_timeout", action)
+        return self.add_action("speech_event_timeout", milliseconds)
 
     def remove_global_data(self, keys: Union[str, List[str]]) -> 'SwaigFunctionResult':
         """
@@ -422,8 +414,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"unset_global_data": keys}
-        return self.add_action("unset_global_data", action)
+        return self.add_action("unset_global_data", keys)
 
     def set_metadata(self, data: Dict[str, Any]) -> 'SwaigFunctionResult':
         """
@@ -435,8 +426,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"set_meta_data": data}
-        return self.add_action("set_meta_data", action)
+        return self.add_action("set_meta_data", data)
 
     def remove_metadata(self, keys: Union[str, List[str]]) -> 'SwaigFunctionResult':
         """
@@ -448,8 +438,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"unset_meta_data": keys}
-        return self.add_action("unset_meta_data", action)
+        return self.add_action("unset_meta_data", keys)
 
     def toggle_functions(self, function_toggles: List[Dict[str, Any]]) -> 'SwaigFunctionResult':
         """
@@ -461,8 +450,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"toggle_functions": function_toggles}
-        return self.add_action("toggle_functions", action)
+        return self.add_action("toggle_functions", function_toggles)
 
     def enable_functions_on_timeout(self, enabled: bool = True) -> 'SwaigFunctionResult':
         """
@@ -474,8 +462,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"functions_on_speaker_timeout": enabled}
-        return self.add_action("functions_on_speaker_timeout", action)
+        return self.add_action("functions_on_speaker_timeout", enabled)
 
     def enable_extensive_data(self, enabled: bool = True) -> 'SwaigFunctionResult':
         """
@@ -488,8 +475,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"extensive_data": enabled}
-        return self.add_action("extensive_data", action)
+        return self.add_action("extensive_data", enabled)
 
     def update_settings(self, settings: Dict[str, Any]) -> 'SwaigFunctionResult':
         """
@@ -510,8 +496,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"settings": settings}
-        return self.add_action("settings", action)
+        return self.add_action("settings", settings)
 
     def switch_context(self, system_prompt: Optional[str] = None, user_prompt: Optional[str] = None, 
                       consolidate: bool = False, full_reset: bool = False) -> 'SwaigFunctionResult':
@@ -529,7 +514,7 @@ class SwaigFunctionResult:
         """
         if system_prompt and not user_prompt and not consolidate and not full_reset:
             # Simple string context switch
-            action = {"context_switch": system_prompt}
+            return self.add_action("context_switch", system_prompt)
         else:
             # Advanced object context switch
             context_data = {}
@@ -541,9 +526,7 @@ class SwaigFunctionResult:
                 context_data["consolidate"] = True
             if full_reset:
                 context_data["full_reset"] = True
-            action = {"context_switch": context_data}
-            
-        return self.add_action("context_switch", action)
+            return self.add_action("context_switch", context_data)
 
     def simulate_user_input(self, text: str) -> 'SwaigFunctionResult':
         """
@@ -555,8 +538,7 @@ class SwaigFunctionResult:
         Returns:
             self for method chaining
         """
-        action = {"user_input": text}
-        return self.add_action("user_input", action)
+        return self.add_action("user_input", text)
 
     def send_sms(self, to_number: str, from_number: str, body: Optional[str] = None, 
                 media: Optional[List[str]] = None, tags: Optional[List[str]] = None, 
