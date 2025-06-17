@@ -1,0 +1,190 @@
+"""
+Copyright (c) 2025 SignalWire
+
+This file is part of the SignalWire AI Agents SDK.
+
+Licensed under the MIT License.
+See LICENSE file in the project root for full license information.
+"""
+
+from typing import List, Dict, Any
+import re
+
+from signalwire_agents.core.skill_base import SkillBase
+from signalwire_agents.core.data_map import DataMap
+from signalwire_agents.core.function_result import SwaigFunctionResult
+
+
+class SWMLTransferSkill(SkillBase):
+    """Skill for transferring calls between agents using SWML with pattern matching"""
+    
+    SKILL_NAME = "swml_transfer"
+    SKILL_DESCRIPTION = "Transfer calls between agents based on pattern matching"
+    SKILL_VERSION = "1.0.0"
+    REQUIRED_PACKAGES = []
+    REQUIRED_ENV_VARS = []
+    
+    # Enable multiple instances support
+    SUPPORTS_MULTIPLE_INSTANCES = True
+    
+    def get_instance_key(self) -> str:
+        """
+        Get the key used to track this skill instance
+        
+        For SWML transfer, we use the tool name to differentiate instances
+        """
+        tool_name = self.params.get('tool_name', 'transfer_call')
+        return f"{self.SKILL_NAME}_{tool_name}"
+    
+    def setup(self) -> bool:
+        """Setup and validate skill configuration"""
+        # Validate required parameters
+        required_params = ['transfers']
+        missing_params = [param for param in required_params if not self.params.get(param)]
+        if missing_params:
+            self.logger.error(f"Missing required parameters: {missing_params}")
+            return False
+        
+        # Validate transfers structure
+        transfers = self.params.get('transfers', {})
+        if not isinstance(transfers, dict):
+            self.logger.error("'transfers' parameter must be a dictionary")
+            return False
+        
+        # Validate each transfer configuration
+        for pattern, config in transfers.items():
+            if not isinstance(config, dict):
+                self.logger.error(f"Transfer config for pattern '{pattern}' must be a dictionary")
+                return False
+            
+            if 'url' not in config:
+                self.logger.error(f"Transfer config for pattern '{pattern}' must include 'url'")
+                return False
+            
+            # Set defaults for optional fields
+            config.setdefault('message', f"Transferring you now...")
+            config.setdefault('return_message', "The transfer is complete. How else can I help you?")
+            config.setdefault('post_process', True)
+        
+        # Store configuration
+        self.tool_name = self.params.get('tool_name', 'transfer_call')
+        self.description = self.params.get('description', 'Transfer call based on pattern matching')
+        self.parameter_name = self.params.get('parameter_name', 'transfer_type')
+        self.parameter_description = self.params.get('parameter_description', 'The type of transfer to perform')
+        self.transfers = transfers
+        self.default_message = self.params.get('default_message', 'Please specify a valid transfer type.')
+        self.default_post_process = self.params.get('default_post_process', False)
+        
+        return True
+    
+    def register_tools(self) -> None:
+        """Register the transfer tool with pattern matching"""
+        
+        # Build the DataMap tool with all patterns
+        transfer_tool = (DataMap(self.tool_name)
+            .description(self.description)
+            .parameter(self.parameter_name, 'string', self.parameter_description, required=True)
+        )
+        
+        # Add expression for each pattern
+        for pattern, config in self.transfers.items():
+            # Create the function result with transfer
+            result = SwaigFunctionResult(
+                config['message'], 
+                post_process=config['post_process']
+            ).swml_transfer(
+                config['url'], 
+                config['return_message']
+            )
+            
+            # Add the expression to the DataMap
+            transfer_tool = transfer_tool.expression(
+                f'${{{f"args.{self.parameter_name}"}}}',
+                pattern,
+                result
+            )
+        
+        # Add default fallback expression
+        default_result = SwaigFunctionResult(
+            self.default_message,
+            post_process=self.default_post_process
+        )
+        transfer_tool = transfer_tool.expression(
+            f'${{{f"args.{self.parameter_name}"}}}',
+            r'/.*/',  # Match anything as fallback
+            default_result
+        )
+        
+        # Register the tool with the agent
+        if hasattr(self.agent, 'register_swaig_function'):
+            self.agent.register_swaig_function(transfer_tool.to_swaig_function())
+        else:
+            # Fallback to define_tool if register_swaig_function is not available
+            self.logger.error("Agent does not have register_swaig_function method")
+    
+    def get_hints(self) -> List[str]:
+        """Return speech recognition hints"""
+        hints = []
+        
+        # Extract common words from patterns for hints
+        for pattern in self.transfers.keys():
+            # Remove regex delimiters and flags
+            clean_pattern = pattern.strip('/')
+            if clean_pattern.endswith('i'):
+                clean_pattern = clean_pattern[:-1]
+            
+            # Only add if it's not a catch-all pattern
+            if clean_pattern and not clean_pattern.startswith('.'):
+                # Handle patterns with alternatives (e.g., "sales|billing")
+                if '|' in clean_pattern:
+                    for part in clean_pattern.split('|'):
+                        hints.append(part.strip().lower())
+                else:
+                    hints.append(clean_pattern.lower())
+        
+        # Add common transfer-related words
+        hints.extend(['transfer', 'connect', 'speak to', 'talk to'])
+        
+        return hints
+    
+    def get_prompt_sections(self) -> List[Dict[str, Any]]:
+        """Return prompt sections to add to agent"""
+        sections = []
+        
+        # Build a list of transfer destinations with their patterns
+        if self.transfers:
+            transfer_bullets = []
+            
+            for pattern, config in self.transfers.items():
+                # Extract meaningful name from pattern
+                # Remove regex delimiters and flags
+                clean_pattern = pattern.strip('/')
+                if clean_pattern.endswith('i'):
+                    clean_pattern = clean_pattern[:-1]
+                
+                # Only add if it's not a catch-all pattern
+                if clean_pattern and not clean_pattern.startswith('.'):
+                    # Create a description for this transfer destination
+                    transfer_desc = f'"{clean_pattern}" - transfers to {config.get("url", "configured URL")}'
+                    transfer_bullets.append(transfer_desc)
+            
+            # Add the Transferring section
+            sections.append({
+                "title": "Transferring",
+                "body": f"You can transfer calls using the {self.tool_name} function with the following destinations:",
+                "bullets": transfer_bullets
+            })
+            
+            # Add usage instructions
+            sections.append({
+                "title": "Transfer Instructions",
+                "body": f"How to use the transfer capability:",
+                "bullets": [
+                    f"Use the {self.tool_name} function when a transfer is needed",
+                    f"Pass the destination type to the '{self.parameter_name}' parameter",
+                    f"The system will match patterns and handle the transfer automatically",
+                    "After transfer completes, you'll regain control of the conversation"
+                ]
+            })
+        
+        return sections

@@ -154,6 +154,68 @@ agent.add_skill("native_vector_search", {
 
 For complete documentation, see [Local Search System](search-system.md).
 
+### SWML Transfer (`swml_transfer`)
+Transfer calls between agents using pattern matching.
+
+**Requirements:** None (no additional packages or environment variables required)
+
+**Parameters:**
+- `tool_name` (default: "transfer_call") - Custom name for the transfer function
+- `description` (default: "Transfer call based on pattern matching") - Tool description
+- `parameter_name` (default: "transfer_type") - Name of the parameter for the transfer function
+- `parameter_description` (default: "The type of transfer to perform") - Parameter description
+- `transfers` (required) - Dictionary mapping regex patterns to transfer configurations:
+  - Pattern (key): Regex pattern to match (e.g., "/sales/i")
+  - Configuration (value): Dictionary with:
+    - `url` (required): Transfer destination URL
+    - `message` (optional): Pre-transfer message
+    - `return_message` (optional): Post-transfer message
+    - `post_process` (optional, default: True): Enable post-processing
+- `default_message` (default: "Please specify a valid transfer type.") - Message when no pattern matches
+- `default_post_process` (default: False) - Post-processing flag for default case
+
+**Tools provided:**
+- `transfer_call(transfer_type)` (or custom tool_name) - Transfer based on pattern matching
+
+**Usage examples:**
+```python
+# Simple transfer between departments
+agent.add_skill("swml_transfer", {
+    "tool_name": "transfer_to_department",
+    "transfers": {
+        "/sales/i": {
+            "url": "https://example.com/sales",
+            "message": "Transferring to sales...",
+            "return_message": "Sales transfer complete."
+        },
+        "/support/i": {
+            "url": "https://example.com/support",
+            "message": "Transferring to support...",
+            "return_message": "Support transfer complete."
+        }
+    }
+})
+
+# Multiple instances for different transfer types
+agent.add_skill("swml_transfer", {
+    "tool_name": "route_call",
+    "parameter_name": "department",
+    "transfers": {
+        "/sales|billing/i": {
+            "url": "https://api.company.com/sales",
+            "message": "Connecting to sales team...",
+            "post_process": True
+        },
+        "/technical|support/i": {
+            "url": "https://api.company.com/support",
+            "message": "Connecting to support team...",
+            "post_process": True
+        }
+    },
+    "default_message": "Would you like sales or support?"
+})
+```
+
 ## Usage Examples
 
 ### Basic Usage
