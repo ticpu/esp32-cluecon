@@ -785,8 +785,11 @@ class SWMLService:
             # This avoids the FastAPI error about prefixes ending with slashes
             normalized_route = "/" + self.route.strip("/")
             
-            # Include router with the normalized prefix
-            app.include_router(router, prefix=normalized_route)
+            # Include router with the normalized prefix (handle root route special case)
+            if normalized_route == "/":
+                app.include_router(router)
+            else:
+                app.include_router(router, prefix=normalized_route)
             
             # Add a catch-all route handler that will handle both /path and /path/ formats
             # This provides the same behavior without using a trailing slash in the prefix

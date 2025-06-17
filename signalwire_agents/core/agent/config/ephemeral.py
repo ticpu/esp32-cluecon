@@ -140,6 +140,24 @@ class EphemeralAgentConfig:
             self._function_includes.append(include)
         return self
     
+    def add_skill(self, skill_name: str, config: Optional[Dict[str, Any]] = None) -> 'EphemeralAgentConfig':
+        """
+        Add a skill (placeholder for dynamic config - skills can't be truly added per-request)
+        
+        Note: Skills involve loading code and registering functions, which can't be done
+        per-request. This method exists for API compatibility but doesn't actually add skills.
+        
+        Args:
+            skill_name: Name of the skill
+            config: Optional configuration for the skill
+            
+        Returns:
+            Self for method chaining
+        """
+        # Log or store the skill request, but don't actually try to add it
+        # Skills need to be added during agent initialization, not per-request
+        return self
+    
     def extract_config(self) -> Dict[str, Any]:
         """
         Extract the configuration as a dictionary for applying to the real agent.

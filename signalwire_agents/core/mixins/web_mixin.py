@@ -20,7 +20,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from signalwire_agents.core.logging_config import get_execution_mode
 from signalwire_agents.core.function_result import SwaigFunctionResult
-from signalwire_agents.core.agent.config.ephemeral import EphemeralAgentConfig
 
 
 class WebMixin:
@@ -234,8 +233,11 @@ class WebMixin:
                 # Default: 404
                 return {"error": "Path not found"}
             
-            # Include router with prefix
-            app.include_router(router, prefix=self.route)
+            # Include router with prefix (handle root route special case)
+            if self.route == "/":
+                app.include_router(router)
+            else:
+                app.include_router(router, prefix=self.route)
             
             # Log all app routes for debugging
             self.log.debug("app_routes_registered")
@@ -658,7 +660,7 @@ class WebMixin:
             
             # SECURITY BYPASS FOR DEBUGGING - make all functions work regardless of token
             # We'll log the attempt but allow it through
-            token = request.query_params.get("token")
+            token = request.query_params.get("__token") or request.query_params.get("token")  # Check __token first, fallback to token
             if token:
                 req_log.debug("token_found", token_length=len(token))
                 
@@ -745,7 +747,7 @@ class WebMixin:
                 req_log = req_log.bind(call_id=call_id)
                 
             # Check token if provided
-            token = request.query_params.get("token")
+            token = request.query_params.get("__token") or request.query_params.get("token")  # Check __token first, fallback to token
             token_validated = False
             
             if token:
@@ -934,40 +936,15 @@ class WebMixin:
                 body_params = request_data or {}
                 headers = dict(request.headers)
                 
-                # Create ephemeral configurator
-                agent_config = EphemeralAgentConfig()
+                # Call the user's configuration callback with the actual agent instance
+                # This allows FULL dynamic configuration including adding skills
+                self._dynamic_config_callback(query_params, body_params, headers, self)
                 
-                # Call the user's configuration callback
-                self._dynamic_config_callback(query_params, body_params, headers, agent_config)
-                
-                # Extract the configuration
-                config = agent_config.extract_config()
-                if config:
-                    # Handle ephemeral prompt sections by applying them to this agent instance
-                    if "_ephemeral_prompt_sections" in config:
-                        for section in config["_ephemeral_prompt_sections"]:
-                            self.prompt_add_section(
-                                section["title"],
-                                section.get("body", ""),
-                                section.get("bullets"),
-                                **{k: v for k, v in section.items() if k not in ["title", "body", "bullets"]}
-                            )
-                        del config["_ephemeral_prompt_sections"]
-                    
-                    if "_ephemeral_raw_prompt" in config:
-                        self._raw_prompt = config["_ephemeral_raw_prompt"]
-                        del config["_ephemeral_raw_prompt"]
-                    
-                    if "_ephemeral_post_prompt" in config:
-                        self._post_prompt = config["_ephemeral_post_prompt"]
-                        del config["_ephemeral_post_prompt"]
-                    
-                    return config
-                    
             except Exception as e:
                 self.log.error("dynamic_config_error", error=str(e))
         
-        # Default implementation does nothing
+        # Return None to indicate no SWML modifications needed
+        # (The callback has already modified the agent directly)
         return None
 
     def register_routing_callback(self, callback_fn: Callable[[Request, Dict[str, Any]], Optional[str]], 
@@ -999,25 +976,28 @@ class WebMixin:
             self._routing_callbacks = {}
         self._routing_callbacks[normalized_path] = callback_fn
 
-    def set_dynamic_config_callback(self, callback: Callable[[dict, dict, dict, EphemeralAgentConfig], None]) -> 'AgentBase':
+    def set_dynamic_config_callback(self, callback: Callable[[dict, dict, dict, 'AgentBase'], None]) -> 'AgentBase':
         """
         Set a callback function for dynamic agent configuration
         
-        This callback receives an EphemeralAgentConfig object that provides the same
-        configuration methods as AgentBase, allowing you to dynamically configure
-        the agent's voice, prompt, parameters, etc. based on request data.
+        This callback receives the actual agent instance, allowing you to dynamically
+        configure ANY aspect of the agent including adding skills, modifying prompts,
+        changing parameters, etc. based on request data.
         
         Args:
-            callback: Function that takes (query_params, body_params, headers, agent_config)
-                     and configures the agent_config object using familiar methods like:
-                     - agent_config.add_language(...)
-                     - agent_config.prompt_add_section(...)
-                     - agent_config.set_params(...)
-                     - agent_config.set_global_data(...)
+            callback: Function that takes (query_params, body_params, headers, agent)
+                     and configures the agent using any available methods like:
+                     - agent.add_skill(...)
+                     - agent.add_language(...)
+                     - agent.prompt_add_section(...)
+                     - agent.set_params(...)
+                     - agent.set_global_data(...)
+                     - agent.define_tool(...)
                      
         Example:
             def my_config(query_params, body_params, headers, agent):
                 if query_params.get('tier') == 'premium':
+                    agent.add_skill("advanced_search")
                     agent.add_language("English", "en-US", "premium_voice")
                     agent.set_params({"end_of_speech_timeout": 500})
                 agent.set_global_data({"tier": query_params.get('tier', 'standard')})

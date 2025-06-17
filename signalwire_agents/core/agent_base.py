@@ -261,6 +261,9 @@ class AgentBase(
         self._contexts_builder = None
         self._contexts_defined = False
         
+        # Initialize SWAIG query params for dynamic config
+        self._swaig_query_params = {}
+        
         self.schema_utils = SchemaUtils(schema_path)
         if self.schema_utils and self.schema_utils.schema:
             self.log.debug("schema_loaded", path=self.schema_utils.schema_path)
@@ -490,6 +493,42 @@ class AgentBase(
         self._post_prompt_url_override = url
         return self
     
+    def add_swaig_query_params(self, params: Dict[str, str]) -> 'AgentBase':
+        """
+        Add query parameters that will be included in all SWAIG webhook URLs
+        
+        This is particularly useful for preserving dynamic configuration state
+        across SWAIG callbacks. For example, if your dynamic config adds skills
+        based on query parameters, you can pass those same parameters through
+        to the SWAIG webhook so the same configuration is applied.
+        
+        Args:
+            params: Dictionary of query parameters to add to SWAIG URLs
+            
+        Returns:
+            Self for method chaining
+            
+        Example:
+            def dynamic_config(query_params, body_params, headers, agent):
+                if query_params.get('tier') == 'premium':
+                    agent.add_skill('advanced_search')
+                    # Preserve the tier param so SWAIG callbacks work
+                    agent.add_swaig_query_params({'tier': 'premium'})
+        """
+        if params and isinstance(params, dict):
+            self._swaig_query_params.update(params)
+        return self
+    
+    def clear_swaig_query_params(self) -> 'AgentBase':
+        """
+        Clear all SWAIG query parameters
+        
+        Returns:
+            Self for method chaining
+        """
+        self._swaig_query_params = {}
+        return self
+    
     def _render_swml(self, call_id: str = None, modifications: Optional[dict] = None) -> str:
         """
         Render the complete SWML document using SWMLService methods
@@ -515,8 +554,8 @@ class AgentBase(
         if self._enable_state_tracking and call_id is None:
             call_id = self._session_manager.create_session()
             
-        # Empty query params - no need to include call_id in URLs
-        query_params = {}
+        # Start with any SWAIG query params that were set
+        query_params = self._swaig_query_params.copy() if self._swaig_query_params else {}
         
         # Get the default webhook URL with auth
         default_webhook_url = self._build_webhook_url("swaig", query_params)
@@ -584,10 +623,13 @@ class AgentBase(
                 if hasattr(func, 'webhook_url') and func.webhook_url:
                     # External webhook function - use the provided URL directly
                     function_entry["web_hook_url"] = func.webhook_url
-                elif token:
-                    # Local function with token - build local webhook URL
-                    token_params = {"token": token}
-                    function_entry["web_hook_url"] = self._build_webhook_url("swaig", token_params)
+                elif token or self._swaig_query_params:
+                    # Local function with token OR SWAIG query params - build local webhook URL
+                    # Start with SWAIG query params
+                    url_params = self._swaig_query_params.copy() if self._swaig_query_params else {}
+                    if token:
+                        url_params["__token"] = token  # Use __token to avoid collision
+                    function_entry["web_hook_url"] = self._build_webhook_url("swaig", url_params)
             
             functions.append(function_entry)
         
@@ -599,12 +641,13 @@ class AgentBase(
         post_prompt_url = None
         if post_prompt:
             # Create a token for post_prompt if we have a call_id
-            query_params = {}
+            # Start with SWAIG query params
+            query_params = self._swaig_query_params.copy() if self._swaig_query_params else {}
             if call_id and hasattr(self, '_session_manager'):
                 try:
                     token = self._session_manager.create_tool_token("post_prompt", call_id)
                     if token:
-                        query_params["token"] = token
+                        query_params["__token"] = token  # Use __token to avoid collision
                 except Exception as e:
                     self.log.error("post_prompt_token_creation_error", error=str(e))
             
@@ -871,3 +914,50 @@ class AgentBase(
                         return pdata["raw"]
                         
         return None
+    
+    async def _handle_request(self, request: Request, response: Response):
+        """
+        Override SWMLService's _handle_request to use AgentBase's _render_swml
+        
+        This ensures that when routes are handled by SWMLService's router,
+        they still use AgentBase's SWML rendering logic.
+        """
+        # Use WebMixin's implementation if available
+        if hasattr(super(), '_handle_root_request'):
+            return await self._handle_root_request(request)
+        
+        # Fallback to basic implementation
+        try:
+            # Parse body if POST request
+            body = {}
+            if request.method == "POST":
+                try:
+                    body = await request.json()
+                except:
+                    pass
+            
+            # Get call_id
+            call_id = body.get("call_id") if body else request.query_params.get("call_id")
+            
+            # Check auth
+            if not self._check_basic_auth(request):
+                return Response(
+                    content=json.dumps({"error": "Unauthorized"}),
+                    status_code=401,
+                    headers={"WWW-Authenticate": "Basic"},
+                    media_type="application/json"
+                )
+            
+            # Render SWML using AgentBase's method
+            swml = self._render_swml(call_id)
+            
+            return Response(
+                content=swml,
+                media_type="application/json"
+            )
+        except Exception as e:
+            return Response(
+                content=json.dumps({"error": str(e)}),
+                status_code=500,
+                media_type="application/json"
+            )

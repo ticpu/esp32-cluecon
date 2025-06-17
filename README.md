@@ -664,7 +664,49 @@ class DynamicAgent(AgentBase):
 - **Localization**: Language and cultural adaptation based on user location
 - **Dynamic Pricing**: Adjust features and capabilities based on subscription tiers
 
-The `EphemeralAgentConfig` object provides all the same familiar methods as `AgentBase` (like `add_language()`, `prompt_add_section()`, `set_global_data()`) but applies them per-request instead of at startup.
+### Preserving Dynamic State in SWAIG Callbacks
+
+When using dynamic configuration to add skills or tools based on request parameters, there's a challenge: SWAIG webhook callbacks are separate HTTP requests that won't have the original query parameters. The SDK provides `add_swaig_query_params()` to solve this:
+
+```python
+class DynamicAgent(AgentBase):
+    def __init__(self):
+        super().__init__(name="dynamic-agent", route="/agent")
+        self.set_dynamic_config_callback(self.configure_per_request)
+    
+    def configure_per_request(self, query_params, body_params, headers, agent):
+        tier = query_params.get('tier', 'basic')
+        region = query_params.get('region', 'us-east')
+        
+        if tier == 'premium':
+            # Add premium skills dynamically
+            agent.add_skill('advanced_search', {
+                'api_key': 'your-api-key',
+                'num_results': 5
+            })
+            
+            # IMPORTANT: Preserve parameters for SWAIG callbacks
+            agent.add_swaig_query_params({
+                'tier': tier,
+                'region': region
+            })
+            
+            # Now when SignalWire calls the SWAIG webhook, these params
+            # will be included, triggering the same dynamic configuration
+
+# Initial request: GET /agent?tier=premium&region=eu-west
+# SWAIG callback: POST /swaig/?tier=premium&region=eu-west
+# Result: Premium skills are available in both requests!
+```
+
+**Key Points:**
+
+- **Problem**: Dynamically added skills/tools won't exist during SWAIG callbacks without the original request parameters
+- **Solution**: Use `add_swaig_query_params()` to include critical parameters in all SWAIG webhook URLs
+- **Clear State**: Use `clear_swaig_query_params()` if needed to reset parameters between requests
+- **Token Safety**: The SDK automatically renames security tokens from `token` to `__token` to avoid parameter collisions
+
+This ensures that any dynamic configuration based on request parameters is consistently applied across the initial SWML request and all subsequent SWAIG function callbacks.
 
 For detailed documentation and advanced examples, see the [Agent Guide](docs/agent_guide.md#dynamic-agent-configuration).
 
