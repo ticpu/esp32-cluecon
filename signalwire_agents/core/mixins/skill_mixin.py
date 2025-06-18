@@ -29,6 +29,13 @@ class SkillMixin:
         Raises:
             ValueError: If skill not found or failed to load with detailed error message
         """
+        # Debug logging
+        self.log.debug("add_skill_called",
+                      skill_name=skill_name,
+                      agent_id=id(self),
+                      registry_id=id(self._tool_registry) if hasattr(self, '_tool_registry') else None,
+                      is_ephemeral=getattr(self, '_is_ephemeral', False))
+        
         success, error_message = self.skill_manager.load_skill(skill_name, params=params)
         if not success:
             raise ValueError(f"Failed to load skill '{skill_name}': {error_message}")

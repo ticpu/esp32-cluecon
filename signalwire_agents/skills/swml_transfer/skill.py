@@ -57,14 +57,21 @@ class SWMLTransferSkill(SkillBase):
                 self.logger.error(f"Transfer config for pattern '{pattern}' must be a dictionary")
                 return False
             
-            if 'url' not in config:
-                self.logger.error(f"Transfer config for pattern '{pattern}' must include 'url'")
+            # Must have either 'url' or 'address'
+            if 'url' not in config and 'address' not in config:
+                self.logger.error(f"Transfer config for pattern '{pattern}' must include either 'url' or 'address'")
+                return False
+            
+            if 'url' in config and 'address' in config:
+                self.logger.error(f"Transfer config for pattern '{pattern}' cannot have both 'url' and 'address'")
                 return False
             
             # Set defaults for optional fields
             config.setdefault('message', f"Transferring you now...")
             config.setdefault('return_message', "The transfer is complete. How else can I help you?")
             config.setdefault('post_process', True)
+            config.setdefault('final', True)  # Default to permanent transfer
+            # from_addr is optional for connect action only
         
         # Store configuration
         self.tool_name = self.params.get('tool_name', 'transfer_call')
@@ -115,11 +122,21 @@ class SWMLTransferSkill(SkillBase):
                     "call_data": call_data
                 })
             
-            # Add the transfer action
-            result = result.swml_transfer(
-                config['url'], 
-                config['return_message']
-            )
+            # Add the transfer action based on whether url or address is provided
+            if 'url' in config:
+                # Use swml_transfer for SWML endpoints
+                result = result.swml_transfer(
+                    config['url'], 
+                    config['return_message'],
+                    config.get('final', True)
+                )
+            else:
+                # Use connect for addresses (phone numbers, SIP, etc.)
+                result = result.connect(
+                    config['address'],
+                    config.get('final', True),
+                    config.get('from_addr', None)
+                )
             
             # Add the expression to the DataMap
             transfer_tool = transfer_tool.expression(
@@ -199,7 +216,11 @@ class SWMLTransferSkill(SkillBase):
                 # Only add if it's not a catch-all pattern
                 if clean_pattern and not clean_pattern.startswith('.'):
                     # Create a description for this transfer destination
-                    transfer_desc = f'"{clean_pattern}" - transfers to {config.get("url", "configured URL")}'
+                    if 'url' in config:
+                        destination = config['url']
+                    else:
+                        destination = config['address']
+                    transfer_desc = f'"{clean_pattern}" - transfers to {destination}'
                     transfer_bullets.append(transfer_desc)
             
             # Add the Transferring section

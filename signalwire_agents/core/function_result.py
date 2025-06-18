@@ -188,7 +188,7 @@ class SwaigFunctionResult:
         self.action.append(swml_action)
         return self
 
-    def swml_transfer(self, dest: str, ai_response: str) -> 'SwaigFunctionResult':
+    def swml_transfer(self, dest: str, ai_response: str, final: bool = True) -> 'SwaigFunctionResult':
         """
         Add a SWML transfer action with AI response setup for when transfer completes.
         
@@ -202,22 +202,28 @@ class SwaigFunctionResult:
         Args:
             dest: Destination URL for the transfer (SWML endpoint, SIP address, etc.)
             ai_response: Message the AI should say when transfer completes and control returns
+            final: Whether this is a permanent transfer (True) or temporary (False).
+                  Defaults to True for permanent transfers (same as connect method).
                         
         Returns:
             Self for method chaining
             
         Example:
-            # Transfer with post-processing (speak first, then transfer)
+            # Permanent transfer (default)
             result = (
                 SwaigFunctionResult("I'm transferring you to support", post_process=True)
                 .swml_transfer(
                     "https://support.example.com/swml",
-                    "The support call is complete. How else can I help?"
+                    "Goodbye!"  # Won't be used since final=True by default
                 )
             )
             
-            # Or enable post-processing with method chaining
-            result.swml_transfer(dest, ai_response).set_post_process(True)
+            # Temporary transfer with return
+            result.swml_transfer(
+                dest, 
+                "The support call is complete. How else can I help?", 
+                final=False
+            )
         """
         # Create the SWML action structure directly
         swml_action = {
@@ -229,7 +235,8 @@ class SwaigFunctionResult:
                         {"transfer": {"dest": dest}}
                     ]
                 }
-            }
+            },
+            "transfer": str(final).lower()  # Convert boolean to "true"/"false" string
         }
         
         # Add to actions list directly

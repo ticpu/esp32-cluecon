@@ -92,6 +92,10 @@ class SWMLService:
         
         # Initialize proxy detection attributes
         self._proxy_url_base = os.environ.get('SWML_PROXY_URL_BASE')
+        if self._proxy_url_base:
+            self.log.warning("SWML_PROXY_URL_BASE is set in environment", 
+                           proxy_url_base=self._proxy_url_base,
+                           message="This overrides SSL configuration and port settings. Remove this variable to use automatic detection.")
         self._proxy_detection_done = False
         self._proxy_debug = os.environ.get('SWML_PROXY_DEBUG', '').lower() in ('true', '1', 'yes')
         
@@ -652,10 +656,8 @@ class SWMLService:
         Returns:
             Response with SWML document or error
         """
-        # Auto-detect proxy on first request if not explicitly configured
-        if not self._proxy_detection_done and not self._proxy_url_base:
-            self._detect_proxy_from_request(request)
-            self._proxy_detection_done = True
+        # Always detect proxy from current request - allows mixing direct and proxied access
+        self._detect_proxy_from_request(request)
             
         # Check auth
         if not self._check_basic_auth(request):
@@ -846,34 +848,27 @@ class SWMLService:
         # Get the auth credentials
         username, password = self._basic_auth
         
-        # Use correct protocol and host in displayed URL
-        protocol = "https" if self.ssl_enabled else "http"
-        
-        # Determine display host - include port unless it's the standard port for the protocol
-        if self.ssl_enabled and self.domain:
-            # Use domain, but include port if it's not the standard HTTPS port (443)
-            display_host = f"{self.domain}:{port}" if port != 443 else self.domain
-        else:
-            # Use host:port for HTTP or when no domain is specified
-            display_host = f"{host}:{port}"
+        # Get the proper URL using unified URL building
+        startup_url = self._build_full_url(include_auth=False)
         
         self.log.info("starting_server", 
-                     url=f"{protocol}://{display_host}{self.route}",
+                     url=startup_url,
                      ssl_enabled=self.ssl_enabled,
                      username=username,
                      password_length=len(password))
         
         # Print user-friendly startup message (keep for UX)
         print(f"Service '{self.name}' is available at:")
-        print(f"URL: {protocol}://{display_host}{self.route}")
-        print(f"URL with trailing slash: {protocol}://{display_host}{self.route}/")
+        print(f"URL: {startup_url}")
+        print(f"URL with trailing slash: {startup_url}/")
         print(f"Basic Auth: {username}:{password}")
         
         # Check if SIP routing is enabled and log additional info
         if self._routing_callbacks:
             print(f"Callback endpoints:")
             for path in self._routing_callbacks:
-                print(f"{protocol}://{display_host}{self.route}{path}")
+                callback_url = self._build_full_url(endpoint=path.lstrip('/'), include_auth=False)
+                print(f"  {callback_url}")
         
         # Start uvicorn with or without SSL
         if self.ssl_enabled and ssl_cert_path and ssl_key_path:
@@ -950,6 +945,116 @@ class SWMLService:
         return username, password
     
         
+    def _get_base_url(self, include_auth: bool = True) -> str:
+        """
+        Get the base URL for this service, using proxy info if available or falling back to configured values
+        
+        This is the central method for URL building that handles both startup configuration
+        and per-request proxy detection.
+        
+        Args:
+            include_auth: Whether to include authentication credentials in the URL
+            
+        Returns:
+            Base URL string (protocol://[auth@]host[:port])
+        """
+        # Check if we have proxy information from a request
+        if hasattr(self, '_proxy_url_base') and self._proxy_url_base:
+            base = self._proxy_url_base.rstrip('/')
+            
+            # Add auth credentials if requested
+            if include_auth:
+                username, password = self._basic_auth
+                url = urlparse(base)
+                base = url._replace(netloc=f"{username}:{password}@{url.netloc}").geturl()
+            
+            return base
+        
+        # No proxy, use configured values
+        # Determine protocol based on SSL settings
+        protocol = "https" if self.ssl_enabled else "http"
+        
+        # Debug logging
+        self.log.debug("_get_base_url",
+                      ssl_enabled=self.ssl_enabled,
+                      domain=self.domain,
+                      port=self.port,
+                      protocol=protocol)
+        
+        # Determine host part
+        if self.ssl_enabled and self.domain:
+            # Use domain for SSL
+            if protocol == "https" and self.port == 443:
+                host_part = self.domain  # Don't include port for standard HTTPS
+            elif protocol == "http" and self.port == 80:
+                host_part = self.domain  # Don't include port for standard HTTP
+            else:
+                host_part = f"{self.domain}:{self.port}"
+                self.log.debug("Using domain with port", domain=self.domain, port=self.port, host_part=host_part)
+        else:
+            # Use configured host
+            if self.host in ("0.0.0.0", "127.0.0.1", "localhost"):
+                host = "localhost"
+            else:
+                host = self.host
+            
+            # Include port unless it's the standard port for the protocol
+            if (protocol == "https" and self.port == 443) or (protocol == "http" and self.port == 80):
+                host_part = host
+            else:
+                host_part = f"{host}:{self.port}"
+        
+        # Build base URL
+        if include_auth:
+            username, password = self._basic_auth
+            base = f"{protocol}://{username}:{password}@{host_part}"
+        else:
+            base = f"{protocol}://{host_part}"
+        
+        return base
+    
+    def _build_full_url(self, endpoint: str = "", include_auth: bool = True, query_params: Optional[Dict[str, str]] = None) -> str:
+        """
+        Build the full URL for this service or a specific endpoint
+        
+        This is the internal implementation used by both get_full_url (for AgentBase compatibility)
+        and _build_webhook_url.
+        
+        Args:
+            endpoint: Optional endpoint path (e.g., "swaig", "post_prompt")
+            include_auth: Whether to include authentication credentials in the URL
+            query_params: Optional query parameters to append
+            
+        Returns:
+            Full URL string
+        """
+        # Get base URL using central method
+        base = self._get_base_url(include_auth=include_auth)
+        
+        # Build path
+        if endpoint:
+            # Ensure endpoint doesn't start with slash
+            endpoint = endpoint.lstrip('/')
+            # Add trailing slash to endpoint to prevent redirects
+            if not endpoint.endswith('/'):
+                endpoint = f"{endpoint}/"
+            path = f"{self.route}/{endpoint}"
+        else:
+            # Just the route itself
+            path = self.route if self.route != "/" else ""
+        
+        # Construct full URL
+        url = f"{base}{path}"
+        
+        # Add query parameters if any
+        if query_params:
+            filtered_params = {k: v for k, v in query_params.items() if v}
+            if filtered_params:
+                params = "&".join([f"{k}={v}" for k, v in filtered_params.items()])
+                url = f"{url}?{params}"
+        
+        return url
+    
     def _build_webhook_url(self, endpoint: str, query_params: Optional[Dict[str, str]] = None) -> str:
         """
         Helper method to build webhook URLs consistently
@@ -961,54 +1066,8 @@ class SWMLService:
         Returns:
             Fully constructed webhook URL
         """
-        # Base URL construction
-        if hasattr(self, '_proxy_url_base') and getattr(self, '_proxy_url_base', None):
-            # For proxy URLs
-            base = self._proxy_url_base.rstrip('/')
-            
-            # Always add auth credentials
-            username, password = self._basic_auth
-            url = urlparse(base)
-            base = url._replace(netloc=f"{username}:{password}@{url.netloc}").geturl()
-        else:
-            # Determine protocol based on SSL settings
-            protocol = "https" if getattr(self, 'ssl_enabled', False) else "http"
-            
-            # Use domain if available and SSL is enabled
-            if getattr(self, 'ssl_enabled', False) and getattr(self, 'domain', None):
-                # Use domain, but include port if it's not the standard HTTPS port (443)
-                host_part = f"{self.domain}:{self.port}" if self.port != 443 else self.domain
-            else:
-                # For local URLs
-                if self.host in ("0.0.0.0", "127.0.0.1", "localhost"):
-                    host = "localhost"
-                else:
-                    host = self.host
-                
-                host_part = f"{host}:{self.port}"
-                
-            # Always include auth credentials
-            username, password = self._basic_auth
-            base = f"{protocol}://{username}:{password}@{host_part}"
-        
-        # Ensure the endpoint has a trailing slash to prevent redirects
-        if endpoint and not endpoint.endswith('/'):
-            endpoint = f"{endpoint}/"
-            
-        # Simple path - use the route directly with the endpoint
-        path = f"{self.route}/{endpoint}"
-            
-        # Construct full URL
-        url = f"{base}{path}"
-        
-        # Add query parameters if any (only if they have values)
-        if query_params:
-            filtered_params = {k: v for k, v in query_params.items() if v}
-            if filtered_params:
-                params = "&".join([f"{k}={v}" for k, v in filtered_params.items()])
-                url = f"{url}?{params}"
-            
-        return url 
+        # Use the central URL building method
+        return self._build_full_url(endpoint=endpoint, include_auth=True, query_params=query_params) 
 
     def _detect_proxy_from_request(self, request: Request) -> None:
         """

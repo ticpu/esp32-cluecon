@@ -192,12 +192,29 @@ class PromptManager:
             bullets: Optional list of bullet points to add
         """
         if self.agent._use_pom and self.agent.pom:
-            self.agent.pom.add_to_section(
-                title=title,
-                body=body,
-                bullet=bullet,
-                bullets=bullets
-            )
+            # Find the section first
+            section = self.agent.pom.find_section(title)
+            
+            if section is None:
+                # Section doesn't exist, create it
+                section = self.agent.pom.add_section(title=title)
+            
+            # Add content to the section
+            if body:
+                if section.body:
+                    section.body = f"{section.body}\n\n{body}"
+                else:
+                    section.body = body
+            
+            # Process bullets
+            bullets_to_add = []
+            if bullet:
+                bullets_to_add.append(bullet)
+            if bullets:
+                bullets_to_add.extend(bullets)
+            
+            if bullets_to_add:
+                section.add_bullets(bullets_to_add)
     
     def prompt_add_subsection(
         self,
@@ -248,7 +265,8 @@ class PromptManager:
             True if section exists, False otherwise
         """
         if self.agent._use_pom and self.agent.pom:
-            return self.agent.pom.has_section(title)
+            # Use find_section method from POM
+            return self.agent.pom.find_section(title) is not None
         return False
     
     def get_prompt(self) -> Optional[Union[str, List[Dict[str, Any]]]]:

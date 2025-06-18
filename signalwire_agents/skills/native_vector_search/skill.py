@@ -190,6 +190,37 @@ class NativeVectorSearchSkill(SkillBase):
             **self.swaig_fields
         )
         
+        # Add our tool to the Knowledge Search section
+        search_mode = "remote search server" if self.use_remote else "local document indexes"
+        section_title = "Knowledge Search"
+        
+        # Try to check if section exists, but handle if method doesn't exist
+        section_exists = False
+        try:
+            if hasattr(self.agent, 'prompt_has_section'):
+                section_exists = self.agent.prompt_has_section(section_title)
+        except Exception:
+            # Method might not work, assume section doesn't exist
+            pass
+        
+        if section_exists:
+            # Add bullet to existing section
+            self.agent.prompt_add_to_section(
+                title=section_title,
+                bullet=f"Use {self.tool_name} to search {search_mode}: {description}"
+            )
+        else:
+            # Create the section with this tool
+            self.agent.prompt_add_section(
+                title=section_title,
+                body="You can search various knowledge sources using the following tools:",
+                bullets=[
+                    f"Use {self.tool_name} to search {search_mode}: {description}",
+                    "Search for relevant information using clear, specific queries",
+                    "If no results are found, suggest the user try rephrasing their question or try another knowledge source"
+                ]
+            )
+        
     def _search_handler(self, args, raw_data):
         """Handle search requests"""
         
@@ -365,19 +396,8 @@ class NativeVectorSearchSkill(SkillBase):
         
     def get_prompt_sections(self) -> List[Dict[str, Any]]:
         """Return prompt sections to add to agent"""
-        search_mode = "remote search server" if self.use_remote else "local document indexes"
-        return [
-            {
-                "title": "Document Search",
-                "body": f"You can search {search_mode} using the {self.tool_name} tool.",
-                "bullets": [
-                    f"Use the {self.tool_name} tool when users ask questions about topics that might be in the indexed documents",
-                    "Search for relevant information using clear, specific queries",
-                    "Provide helpful summaries of the search results",
-                    "If no results are found, suggest the user try rephrasing their question or ask about different topics"
-                ]
-            }
-        ]
+        # We'll handle this in register_tools after the agent is set
+        return []
     
     def _add_prompt_section(self, agent):
         """Add prompt section to agent (called during skill loading)"""

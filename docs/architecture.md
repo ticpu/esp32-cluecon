@@ -391,6 +391,7 @@ The SDK is designed to be highly extensible:
    ```python
    def configure_agent_dynamically(self, query_params, body_params, headers, agent):
        # Configure agent differently based on request data
+       # agent is the actual AgentBase instance
        tier = query_params.get('tier', 'standard')
        agent.set_params({"end_of_speech_timeout": 300 if tier == 'premium' else 500})
    
@@ -440,16 +441,16 @@ Dynamic configuration intercepts the SWML document generation process to apply r
 
 ```
 ┌─────────────┐    ┌──────────────────┐    ┌─────────────────────┐    ┌──────────────┐
-│ HTTP        │    │ Dynamic Config   │    │ EphemeralAgent      │    │ SWML         │
-│ Request     │━━━▶│ Callback         │━━━▶│ Config              │━━━▶│ Document     │
+│ HTTP        │    │ Dynamic Config   │    │ Agent Instance      │    │ SWML         │
+│ Request     │━━━▶│ Callback         │━━━▶│ (AgentBase)         │━━━▶│ Document     │
 └─────────────┘    └──────────────────┘    └─────────────────────┘    └──────────────┘
        │                     │                        │                      │
        │                     │                        │                      │
    ┌───▼────┐           ┌────▼─────┐            ┌─────▼──────┐          ┌────▼────┐
-   │Query   │           │Request   │            │Agent       │          │Rendered │
-   │Params  │           │Data      │            │Builder     │          │Response │
-   │Body    │           │Analysis  │            │Methods     │          │         │
-   │Headers │           │Logic     │            │Execution   │          │         │
+   │Query   │           │Request   │            │Direct      │          │Rendered │
+   │Params  │           │Data      │            │Agent       │          │Response │
+   │Body    │           │Analysis  │            │Config      │          │         │
+   │Headers │           │Logic     │            │            │          │         │
    └────────┘           └──────────┘            └────────────┘          └─────────┘
 ```
 
@@ -457,7 +458,7 @@ Dynamic configuration intercepts the SWML document generation process to apply r
 
 1. **Request Processing**: The framework extracts query parameters, body data, and headers from incoming requests
 2. **Callback Invocation**: If a dynamic configuration callback is registered, it's called with the request data
-3. **Ephemeral Configuration**: The callback configures an `EphemeralAgentConfig` object using familiar AgentBase methods
+3. **Agent Configuration**: The callback receives the actual agent instance (AgentBase) and configures it directly using familiar AgentBase methods
 4. **SWML Generation**: The configuration is applied during SWML document rendering
 5. **Response Delivery**: The customized SWML document is returned to the client
 
@@ -480,9 +481,10 @@ Dynamic configuration intercepts the SWML document generation process to apply r
 │ 3. Check for callback   │                                                       │
 │    ┌────────────────────▼────────────────────┐                                 │
 │    │ if dynamic_config_callback is set:     │                                 │
-│    │   - Create EphemeralAgentConfig        │                                 │
 │    │   - Call callback with request data    │                                 │
-│    │   - Apply ephemeral configuration      │                                 │
+│    │     and agent instance                 │                                 │
+│    │   - Apply configuration directly to    │                                 │
+│    │     the agent                          │                                 │
 │    │ else:                                   │                                 │
 │    │   - Use static agent configuration     │                                 │
 │    └────────────────────┬────────────────────┘                                 │
@@ -504,13 +506,13 @@ Dynamic configuration intercepts the SWML document generation process to apply r
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### EphemeralAgentConfig Architecture
+#### Direct Agent Configuration
 
-The `EphemeralAgentConfig` object provides the same familiar methods as `AgentBase` but applies them temporarily for a single request:
+The dynamic configuration callback receives the actual agent instance, allowing direct manipulation of the agent's configuration for a single request:
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│ EphemeralAgentConfig Structure                                                │
+│ Agent Configuration Methods Available in Callback                             │
 ├───────────────────────────────────────────────────────────────────────────────┤
 │                                                                               │
 │ ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐              │
@@ -538,26 +540,28 @@ The dynamic configuration system is designed with performance in mind:
 
 1. **Lightweight Callbacks**: Configuration callbacks should be fast and avoid heavy computations
 2. **Stateless Operation**: Each request is processed independently without shared state
-3. **Ephemeral Scope**: Configuration objects are created per-request and garbage collected afterward
+3. **Per-Request Scope**: Configuration changes are applied per-request and reset afterward
 4. **Caching Opportunities**: External configuration data can be cached at the application level
 
 #### Memory Management
 
 ```
 Request 1 ┌─────────────┐    Request 2 ┌─────────────┐    Request 3 ┌─────────────┐
-Lifecycle │ CREATE      │    Lifecycle │ CREATE      │    Lifecycle │ CREATE      │
-          │ EphemeralCfg│              │ EphemeralCfg│              │ EphemeralCfg│
+Lifecycle │ RECEIVE     │    Lifecycle │ RECEIVE     │    Lifecycle │ RECEIVE     │
+          │ REQUEST     │              │ REQUEST     │              │ REQUEST     │
           │ ↓           │              │ ↓           │              │ ↓           │
           │ CONFIGURE   │              │ CONFIGURE   │              │ CONFIGURE   │
+          │ AGENT       │              │ AGENT       │              │ AGENT       │
           │ ↓           │              │ ↓           │              │ ↓           │
           │ RENDER SWML │              │ RENDER SWML │              │ RENDER SWML │
           │ ↓           │              │ ↓           │              │ ↓           │
-          │ DESTROY     │              │ DESTROY     │              │ DESTROY     │
+          │ RESET       │              │ RESET       │              │ RESET       │
+          │ CONFIG      │              │ CONFIG      │              │ CONFIG      │
           └─────────────┘              └─────────────┘              └─────────────┘
                │                             │                             │
                ▼                             ▼                             ▼
-          Garbage                       Garbage                       Garbage
-          Collection                    Collection                    Collection
+          Agent returns                Agent returns                Agent returns
+          to baseline                  to baseline                  to baseline
 ```
 
 #### Use Case Patterns
@@ -621,15 +625,18 @@ The system includes robust error handling:
 def configure_agent_dynamically(self, query_params, body_params, headers, agent):
     try:
         # Primary configuration logic
-        self.apply_custom_config(query_params, agent)
+        # agent is the actual AgentBase instance
+        tier = query_params.get('tier', 'standard')
+        if tier == 'premium':
+            agent.set_params({"end_of_speech_timeout": 300})
+            agent.add_hints(["premium support", "priority handling"])
     except ConfigurationError as e:
         # Log error and apply safe defaults
         self.log.error("dynamic_config_error", error=str(e))
-        self.apply_default_config(agent)
+        # Agent retains its base configuration
     except Exception as e:
-        # Catch-all with minimal safe configuration
+        # Catch-all - agent continues with existing configuration
         self.log.error("dynamic_config_critical", error=str(e))
-        agent.add_language("English", "en-US", "rime.spore:mistv2")
 ```
 
 #### Migration Strategy

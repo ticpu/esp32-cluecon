@@ -610,8 +610,9 @@ class AgentServer:
         self.logger.info(f"Starting server on {protocol}://{display_host}")
         for route, agent in self.agents.items():
             username, password = agent.get_basic_auth_credentials()
+            agent_url = agent.get_full_url(include_auth=False)
             self.logger.info(f"Agent '{agent.get_name()}' available at:")
-            self.logger.info(f"URL: {protocol}://{display_host}{route}")
+            self.logger.info(f"URL: {agent_url}")
             self.logger.info(f"Basic Auth: {username}:{password}")
         
         # Start the server with or without SSL

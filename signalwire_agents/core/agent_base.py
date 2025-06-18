@@ -57,7 +57,6 @@ from signalwire_agents.utils.schema_utils import SchemaUtils
 from signalwire_agents.core.logging_config import get_logger, get_execution_mode
 
 # Import refactored components
-from signalwire_agents.core.agent.config.ephemeral import EphemeralAgentConfig
 from signalwire_agents.core.agent.prompt.manager import PromptManager
 from signalwire_agents.core.agent.tools.registry import ToolRegistry
 from signalwire_agents.core.agent.tools.decorator import ToolDecorator
@@ -77,11 +76,11 @@ logger = get_logger("agent_base")
 
 
 class AgentBase(
+    AuthMixin,
+    WebMixin,
     SWMLService,
     PromptMixin,
     ToolMixin,
-    WebMixin,
-    AuthMixin,
     SkillMixin,
     AIConfigMixin,
     ServerlessMixin,
@@ -326,29 +325,12 @@ class AgentBase(
                 # Fallback for local testing
                 base_url = f"https://localhost:7071/api/{function_name}"
         else:
-            # Server mode - check for proxy URL first
-            if hasattr(self, '_proxy_url_base') and self._proxy_url_base:
-                # Use proxy URL when available (from reverse proxy detection)
-                base_url = self._proxy_url_base.rstrip('/')
-            else:
-                # Fallback to local URL construction
-                protocol = 'https' if getattr(self, 'ssl_enabled', False) else 'http'
-                
-                # Determine host part - include port unless it's the standard port for the protocol
-                if getattr(self, 'ssl_enabled', False) and getattr(self, 'domain', None):
-                    # Use domain, but include port if it's not the standard HTTPS port (443)
-                    host_part = f"{self.domain}:{self.port}" if self.port != 443 else self.domain
-                else:
-                    # Use host:port for HTTP or when no domain is specified
-                    host_part = f"{self.host}:{self.port}"
-                
-                base_url = f"{protocol}://{host_part}"
+            # Server mode - use the SWMLService's unified URL building
+            # Build the full URL using the parent's method
+            base_url = self._build_full_url(endpoint="", include_auth=include_auth)
+            return base_url
         
-        # Add route if not already included (for server mode)
-        if mode == 'server' and self.route and not base_url.endswith(self.route):
-            base_url = f"{base_url}/{self.route.lstrip('/')}"
-        
-        # Add authentication if requested
+        # For serverless modes, add authentication if requested
         if include_auth:
             username, password = self.get_basic_auth_credentials()
             if username and password:
@@ -364,6 +346,10 @@ class AgentBase(
                     parsed.query,
                     parsed.fragment
                 ))
+        
+        # Add route for serverless modes
+        if self.route and self.route != "/" and not base_url.endswith(self.route):
+            base_url = f"{base_url}/{self.route.lstrip('/')}"
         
         return base_url
     
@@ -540,56 +526,110 @@ class AgentBase(
         Returns:
             SWML document as a string
         """
+        self.log.debug("_render_swml_called", 
+                      has_modifications=bool(modifications),
+                      use_ephemeral=bool(modifications and modifications.get("__use_ephemeral_agent")),
+                      has_dynamic_callback=bool(self._dynamic_config_callback))
+        
+        # Check if we need to use an ephemeral agent for dynamic configuration
+        agent_to_use = self
+        if modifications and modifications.get("__use_ephemeral_agent"):
+            # Create an ephemeral copy for this request
+            self.log.debug("creating_ephemeral_agent", 
+                          original_sections=len(self._prompt_manager._sections) if hasattr(self._prompt_manager, '_sections') else 0)
+            agent_to_use = self._create_ephemeral_copy()
+            self.log.debug("ephemeral_agent_created", 
+                          ephemeral_sections=len(agent_to_use._prompt_manager._sections) if hasattr(agent_to_use._prompt_manager, '_sections') else 0)
+            
+            # Extract the request data
+            request = modifications.get("__request")
+            request_data = modifications.get("__request_data", {})
+            
+            if self._dynamic_config_callback:
+                try:
+                    # Extract request data
+                    if request:
+                        query_params = dict(request.query_params)
+                        headers = dict(request.headers)
+                    else:
+                        # No request object - use empty defaults
+                        query_params = {}
+                        headers = {}
+                    body_params = request_data
+                    
+                    # Call the dynamic config callback with the ephemeral agent
+                    # This allows FULL dynamic configuration including adding skills
+                    self.log.debug("calling_dynamic_config_on_ephemeral", has_request=bool(request))
+                    self._dynamic_config_callback(query_params, body_params, headers, agent_to_use)
+                    self.log.debug("dynamic_config_complete",
+                                  ephemeral_sections_after=len(agent_to_use._prompt_manager._sections) if hasattr(agent_to_use._prompt_manager, '_sections') else 0)
+                    
+                except Exception as e:
+                    self.log.error("dynamic_config_error", error=str(e))
+            
+            # Clear the special markers so they don't affect rendering
+            modifications = None
+        
         # Reset the document to a clean state
-        self.reset_document()
+        agent_to_use.reset_document()
         
         # Get prompt
-        prompt = self.get_prompt()
+        prompt = agent_to_use.get_prompt()
         prompt_is_pom = isinstance(prompt, list)
         
         # Get post-prompt
-        post_prompt = self.get_post_prompt()
+        post_prompt = agent_to_use.get_post_prompt()
         
         # Generate a call ID if needed
-        if self._enable_state_tracking and call_id is None:
-            call_id = self._session_manager.create_session()
+        if agent_to_use._enable_state_tracking and call_id is None:
+            call_id = agent_to_use._session_manager.create_session()
             
         # Start with any SWAIG query params that were set
-        query_params = self._swaig_query_params.copy() if self._swaig_query_params else {}
+        query_params = agent_to_use._swaig_query_params.copy() if agent_to_use._swaig_query_params else {}
         
         # Get the default webhook URL with auth
-        default_webhook_url = self._build_webhook_url("swaig", query_params)
+        default_webhook_url = agent_to_use._build_webhook_url("swaig", query_params)
         
         # Use override if set
-        if hasattr(self, '_web_hook_url_override') and self._web_hook_url_override:
-            default_webhook_url = self._web_hook_url_override
+        if hasattr(agent_to_use, '_web_hook_url_override') and agent_to_use._web_hook_url_override:
+            default_webhook_url = agent_to_use._web_hook_url_override
         
         # Prepare SWAIG object (correct format)
         swaig_obj = {}
         
-        # Add defaults if we have functions
-        if self._tool_registry._swaig_functions:
-            swaig_obj["defaults"] = {
-                "web_hook_url": default_webhook_url
-            }
-            
         # Add native_functions if any are defined
-        if self.native_functions:
-            swaig_obj["native_functions"] = self.native_functions
+        if agent_to_use.native_functions:
+            swaig_obj["native_functions"] = agent_to_use.native_functions
         
         # Add includes if any are defined
-        if self._function_includes:
-            swaig_obj["includes"] = self._function_includes
+        if agent_to_use._function_includes:
+            swaig_obj["includes"] = agent_to_use._function_includes
         
         # Add internal_fillers if any are defined
-        if hasattr(self, '_internal_fillers') and self._internal_fillers:
-            swaig_obj["internal_fillers"] = self._internal_fillers
+        if hasattr(agent_to_use, '_internal_fillers') and agent_to_use._internal_fillers:
+            swaig_obj["internal_fillers"] = agent_to_use._internal_fillers
         
         # Create functions array
         functions = []
         
+        # Debug logging to see what functions we have
+        self.log.debug("checking_swaig_functions", 
+                      agent_name=agent_to_use.name,
+                      is_ephemeral=getattr(agent_to_use, '_is_ephemeral', False),
+                      registry_id=id(agent_to_use._tool_registry),
+                      agent_id=id(agent_to_use),
+                      function_count=len(agent_to_use._tool_registry._swaig_functions) if hasattr(agent_to_use._tool_registry, '_swaig_functions') else 0,
+                      functions=list(agent_to_use._tool_registry._swaig_functions.keys()) if hasattr(agent_to_use._tool_registry, '_swaig_functions') else [])
+        
         # Add each function to the functions array
-        for name, func in self._tool_registry._swaig_functions.items():
+        # Check if the registry has the _swaig_functions attribute
+        if not hasattr(agent_to_use._tool_registry, '_swaig_functions'):
+            self.log.warning("tool_registry_missing_swaig_functions",
+                           registry_id=id(agent_to_use._tool_registry),
+                           agent_id=id(agent_to_use))
+            agent_to_use._tool_registry._swaig_functions = {}
+        
+        for name, func in agent_to_use._tool_registry._swaig_functions.items():
             if isinstance(func, dict):
                 # For raw dictionaries (DataMap functions), use the entire dictionary as-is
                 # This preserves data_map and any other special fields
@@ -603,7 +643,7 @@ class AgentBase(
                 # Check if it's secure and get token for secure functions when we have a call_id
                 token = None
                 if func.secure and call_id:
-                    token = self._create_tool_token(tool_name=name, call_id=call_id)
+                    token = agent_to_use._create_tool_token(tool_name=name, call_id=call_id)
                     
                 # Prepare function entry
                 function_entry = {
@@ -623,55 +663,60 @@ class AgentBase(
                 if hasattr(func, 'webhook_url') and func.webhook_url:
                     # External webhook function - use the provided URL directly
                     function_entry["web_hook_url"] = func.webhook_url
-                elif token or self._swaig_query_params:
+                elif token or agent_to_use._swaig_query_params:
                     # Local function with token OR SWAIG query params - build local webhook URL
                     # Start with SWAIG query params
-                    url_params = self._swaig_query_params.copy() if self._swaig_query_params else {}
+                    url_params = agent_to_use._swaig_query_params.copy() if agent_to_use._swaig_query_params else {}
                     if token:
                         url_params["__token"] = token  # Use __token to avoid collision
-                    function_entry["web_hook_url"] = self._build_webhook_url("swaig", url_params)
+                    function_entry["web_hook_url"] = agent_to_use._build_webhook_url("swaig", url_params)
             
             functions.append(function_entry)
         
         # Add functions array to SWAIG object if we have any
         if functions:
             swaig_obj["functions"] = functions
+            # Add defaults section now that we know we have functions
+            if "defaults" not in swaig_obj:
+                swaig_obj["defaults"] = {
+                    "web_hook_url": default_webhook_url
+                }
         
         # Add post-prompt URL with token if we have a post-prompt
         post_prompt_url = None
         if post_prompt:
             # Create a token for post_prompt if we have a call_id
             # Start with SWAIG query params
-            query_params = self._swaig_query_params.copy() if self._swaig_query_params else {}
-            if call_id and hasattr(self, '_session_manager'):
+            query_params = agent_to_use._swaig_query_params.copy() if agent_to_use._swaig_query_params else {}
+            if call_id and hasattr(agent_to_use, '_session_manager'):
                 try:
-                    token = self._session_manager.create_tool_token("post_prompt", call_id)
+                    token = agent_to_use._session_manager.create_tool_token("post_prompt", call_id)
                     if token:
                         query_params["__token"] = token  # Use __token to avoid collision
                 except Exception as e:
-                    self.log.error("post_prompt_token_creation_error", error=str(e))
+                    agent_to_use.log.error("post_prompt_token_creation_error", error=str(e))
             
             # Build the URL with the token (if any)
-            post_prompt_url = self._build_webhook_url("post_prompt", query_params)
+            post_prompt_url = agent_to_use._build_webhook_url("post_prompt", query_params)
             
             # Use override if set
-            if hasattr(self, '_post_prompt_url_override') and self._post_prompt_url_override:
-                post_prompt_url = self._post_prompt_url_override
+            if hasattr(agent_to_use, '_post_prompt_url_override') and agent_to_use._post_prompt_url_override:
+                post_prompt_url = agent_to_use._post_prompt_url_override
                 
         # Add answer verb with auto-answer enabled
-        self.add_verb("answer", {})
+        agent_to_use.add_verb("answer", {})
         
         # Use the AI verb handler to build and validate the AI verb config
         ai_config = {}
         
         # Get the AI verb handler
-        ai_handler = self.verb_registry.get_handler("ai")
+        ai_handler = agent_to_use.verb_registry.get_handler("ai")
         if ai_handler:
             try:
                 # Check if we're in contexts mode
-                if self._contexts_defined and self._contexts_builder:
+                if agent_to_use._contexts_defined and agent_to_use._contexts_builder:
                     # Generate contexts and combine with base prompt
-                    contexts_dict = self._contexts_builder.to_dict()
+                    contexts_dict = agent_to_use._contexts_builder.to_dict()
                     
                     # Determine base prompt (required when using contexts)
                     base_prompt_text = None
@@ -683,7 +728,7 @@ class AgentBase(
                         base_prompt_text = prompt
                     else:
                         # Provide default base prompt if none exists
-                        base_prompt_text = f"You are {self.name}, a helpful AI assistant that follows structured workflows."
+                        base_prompt_text = f"You are {agent_to_use.name}, a helpful AI assistant that follows structured workflows."
                     
                     # Build AI config with base prompt + contexts
                     ai_config = ai_handler.build_config(
@@ -707,28 +752,28 @@ class AgentBase(
                 # Add new configuration parameters to the AI config
                 
                 # Add hints if any
-                if self._hints:
-                    ai_config["hints"] = self._hints
+                if agent_to_use._hints:
+                    ai_config["hints"] = agent_to_use._hints
                 
                 # Add languages if any
-                if self._languages:
-                    ai_config["languages"] = self._languages
+                if agent_to_use._languages:
+                    ai_config["languages"] = agent_to_use._languages
                 
                 # Add pronunciation rules if any
-                if self._pronounce:
-                    ai_config["pronounce"] = self._pronounce
+                if agent_to_use._pronounce:
+                    ai_config["pronounce"] = agent_to_use._pronounce
                 
                 # Add params if any
-                if self._params:
-                    ai_config["params"] = self._params
+                if agent_to_use._params:
+                    ai_config["params"] = agent_to_use._params
                 
                 # Add global_data if any
-                if self._global_data:
-                    ai_config["global_data"] = self._global_data
+                if agent_to_use._global_data:
+                    ai_config["global_data"] = agent_to_use._global_data
                     
             except ValueError as e:
-                if not self._suppress_logs:
-                    self.log.error("ai_verb_config_error", error=str(e))
+                if not agent_to_use._suppress_logs:
+                    agent_to_use.log.error("ai_verb_config_error", error=str(e))
         else:
             # Fallback if no handler (shouldn't happen but just in case)
             ai_config = {
@@ -746,23 +791,23 @@ class AgentBase(
                 ai_config["SWAIG"] = swaig_obj
         
         # Add the new configurations if not already added by the handler
-        if self._hints and "hints" not in ai_config:
-            ai_config["hints"] = self._hints
+        if agent_to_use._hints and "hints" not in ai_config:
+            ai_config["hints"] = agent_to_use._hints
         
-        if self._languages and "languages" not in ai_config:
-            ai_config["languages"] = self._languages
+        if agent_to_use._languages and "languages" not in ai_config:
+            ai_config["languages"] = agent_to_use._languages
         
-        if self._pronounce and "pronounce" not in ai_config:
-            ai_config["pronounce"] = self._pronounce
+        if agent_to_use._pronounce and "pronounce" not in ai_config:
+            ai_config["pronounce"] = agent_to_use._pronounce
         
-        if self._params and "params" not in ai_config:
-            ai_config["params"] = self._params
+        if agent_to_use._params and "params" not in ai_config:
+            ai_config["params"] = agent_to_use._params
         
-        if self._global_data and "global_data" not in ai_config:
-            ai_config["global_data"] = self._global_data
+        if agent_to_use._global_data and "global_data" not in ai_config:
+            ai_config["global_data"] = agent_to_use._global_data
         
         # Add the AI verb to the document
-        self.add_verb("ai", ai_config)
+        agent_to_use.add_verb("ai", ai_config)
         
         # Apply any modifications from the callback to agent state
         if modifications and isinstance(modifications, dict):
@@ -778,12 +823,12 @@ class AgentBase(
                     ai_config[key] = value
             
             # Clear and rebuild the document with the modified AI config
-            self.reset_document()
-            self.add_verb("answer", {})
-            self.add_verb("ai", ai_config)
+            agent_to_use.reset_document()
+            agent_to_use.add_verb("answer", {})
+            agent_to_use.add_verb("ai", ai_config)
         
         # Return the rendered document as a string
-        return self.render_document()
+        return agent_to_use.render_document()
     
     def _build_webhook_url(self, endpoint: str, query_params: Optional[Dict[str, str]] = None) -> str:
         """
@@ -821,16 +866,6 @@ class AgentBase(
             return url
         
         # Server mode - use existing logic with proxy/auth support
-        # Use the parent class's implementation if available and has the same method
-        if hasattr(super(), '_build_webhook_url'):
-            # Ensure _proxy_url_base is synchronized
-            if getattr(self, '_proxy_url_base', None) and hasattr(super(), '_proxy_url_base'):
-                super()._proxy_url_base = self._proxy_url_base
-                
-            # Call parent's implementation
-            return super()._build_webhook_url(endpoint, query_params)
-            
-        # Otherwise, fall back to our own implementation for server mode
         # Base URL construction
         if hasattr(self, '_proxy_url_base') and self._proxy_url_base:
             # For proxy URLs
@@ -915,6 +950,97 @@ class AgentBase(
                         
         return None
     
+    def _create_ephemeral_copy(self):
+        """
+        Create a lightweight copy of this agent for ephemeral configuration.
+        
+        This creates a partial copy that shares most resources but has independent
+        configuration for SWML generation. Used when dynamic configuration callbacks
+        need to modify the agent without affecting the persistent state.
+        
+        Returns:
+            A lightweight copy of the agent suitable for ephemeral modifications
+        """
+        import copy
+        
+        # Create a new instance of the same class
+        cls = self.__class__
+        ephemeral_agent = cls.__new__(cls)
+        
+        # Copy all attributes as shallow references first
+        for key, value in self.__dict__.items():
+            setattr(ephemeral_agent, key, value)
+        
+        # Deep copy only the configuration that affects SWML generation
+        # These are the parts that dynamic config might modify
+        ephemeral_agent._params = copy.deepcopy(self._params)
+        ephemeral_agent._hints = copy.deepcopy(self._hints)
+        ephemeral_agent._languages = copy.deepcopy(self._languages)
+        ephemeral_agent._pronounce = copy.deepcopy(self._pronounce)
+        ephemeral_agent._global_data = copy.deepcopy(self._global_data)
+        ephemeral_agent._function_includes = copy.deepcopy(self._function_includes)
+        
+        # Deep copy the POM object if it exists to prevent sharing prompt sections
+        if hasattr(self, 'pom') and self.pom:
+            ephemeral_agent.pom = copy.deepcopy(self.pom)
+        # Handle native_functions which might be stored as an attribute or property
+        if hasattr(self, '_native_functions'):
+            ephemeral_agent._native_functions = copy.deepcopy(self._native_functions)
+        elif hasattr(self, 'native_functions'):
+            ephemeral_agent.native_functions = copy.deepcopy(self.native_functions)
+        ephemeral_agent._swaig_query_params = copy.deepcopy(self._swaig_query_params)
+        
+        # Create new manager instances that point to the ephemeral agent
+        # This breaks the circular reference and allows independent modification
+        from signalwire_agents.core.agent.prompt.manager import PromptManager
+        from signalwire_agents.core.agent.tools.registry import ToolRegistry
+        
+        # Create new prompt manager for the ephemeral agent
+        ephemeral_agent._prompt_manager = PromptManager(ephemeral_agent)
+        # Copy the prompt sections data
+        if hasattr(self._prompt_manager, '_sections'):
+            ephemeral_agent._prompt_manager._sections = copy.deepcopy(self._prompt_manager._sections)
+        
+        # Create new tool registry for the ephemeral agent
+        ephemeral_agent._tool_registry = ToolRegistry(ephemeral_agent)
+        # Copy the SWAIG functions - we need a shallow copy here because
+        # the functions themselves can be shared, we just need a new dict
+        if hasattr(self._tool_registry, '_swaig_functions'):
+            ephemeral_agent._tool_registry._swaig_functions = self._tool_registry._swaig_functions.copy()
+        if hasattr(self._tool_registry, '_tool_instances'):
+            ephemeral_agent._tool_registry._tool_instances = self._tool_registry._tool_instances.copy()
+        
+        # Create a new skill manager for the ephemeral agent
+        # This is important because skills register tools with the agent's registry
+        from signalwire_agents.core.skill_manager import SkillManager
+        ephemeral_agent.skill_manager = SkillManager(ephemeral_agent)
+        
+        # Copy any already loaded skills from the original agent
+        # This ensures skills loaded during __init__ are available in the ephemeral agent
+        if hasattr(self.skill_manager, 'loaded_skills'):
+            for skill_key, skill_instance in self.skill_manager.loaded_skills.items():
+                # Re-load the skill in the ephemeral agent's context
+                # We need to get the skill name and params from the existing instance
+                skill_name = skill_instance.SKILL_NAME
+                skill_params = getattr(skill_instance, 'params', {})
+                try:
+                    ephemeral_agent.skill_manager.load_skill(skill_name, type(skill_instance), skill_params)
+                except Exception as e:
+                    self.log.warning("failed_to_copy_skill_to_ephemeral", 
+                                   skill_name=skill_name, 
+                                   error=str(e))
+        
+        # Re-bind the tool decorator method to the new instance
+        ephemeral_agent.tool = ephemeral_agent._tool_decorator
+        
+        # Share the logger but bind it to indicate ephemeral copy
+        ephemeral_agent.log = self.log.bind(ephemeral=True)
+        
+        # Mark this as an ephemeral agent to prevent double application of dynamic config
+        ephemeral_agent._is_ephemeral = True
+        
+        return ephemeral_agent
+    
     async def _handle_request(self, request: Request, response: Response):
         """
         Override SWMLService's _handle_request to use AgentBase's _render_swml
@@ -961,3 +1087,4 @@ class AgentBase(
                 status_code=500,
                 media_type="application/json"
             )
+    

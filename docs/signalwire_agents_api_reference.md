@@ -801,7 +801,7 @@ agent.set_post_prompt_url("https://myserver.com/post-prompt")
 
 ```python
 def set_dynamic_config_callback(
-    callback: Callable[[dict, dict, dict, EphemeralAgentConfig], None]
+    callback: Callable[[dict, dict, dict, AgentBase], None]
 ) -> AgentBase
 ```
 Set callback for per-request dynamic configuration.
@@ -2961,29 +2961,26 @@ Generate the complete SWML document for the service.
 ##### `handle_request(request_data: Dict[str, Any]) -> Dict[str, Any]`
 Handle incoming HTTP requests and generate appropriate responses.
 
-### EphemeralAgentConfig Class
+### Dynamic Configuration
 
-Used in dynamic configuration callbacks to modify agent settings per-request.
-
-#### Available Methods
-
-All the same configuration methods as `AgentBase`:
-- `add_language()`, `add_hint()`, `set_params()`
-- `prompt_add_section()`, `set_global_data()`
-- `add_function_include()`, `set_native_functions()`
+The dynamic configuration callback receives the agent instance directly, allowing you to configure it based on request data.
 
 **Usage:**
 ```python
-def dynamic_config(query_params, headers, body, config):
+def dynamic_config(query_params, body_params, headers, agent):
     # Configure based on request
     if query_params.get("lang") == "es":
-        config.add_language("Spanish", "es-ES", "nova.luna")
+        agent.add_language("Spanish", "es-ES", "nova.luna")
     
     # Customer-specific configuration
     customer_id = headers.get("X-Customer-ID")
     if customer_id:
-        config.set_global_data({"customer_id": customer_id})
-        config.prompt_add_section("Customer Context", f"You are helping customer {customer_id}")
+        agent.set_global_data({"customer_id": customer_id})
+        agent.prompt_add_section("Customer Context", f"You are helping customer {customer_id}")
+    
+    # Add skills dynamically
+    if query_params.get("enable_search") == "true":
+        agent.add_skill("web_search", {"provider": "google"})
 
 agent.set_dynamic_config_callback(dynamic_config)
 ```

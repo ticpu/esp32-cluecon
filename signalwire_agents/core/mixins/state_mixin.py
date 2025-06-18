@@ -150,36 +150,7 @@ class StateMixin:
             self.log.error("token_validation_error", error=str(e), function=function_name)
             return False
     
-    def set_dynamic_config_callback(self, callback: Callable[[dict, dict, dict, 'AgentBase'], None]) -> 'AgentBase':
-        """
-        Set a callback function for dynamic agent configuration
-        
-        This callback receives the actual agent instance, allowing you to dynamically
-        configure ANY aspect of the agent including adding skills, modifying prompts,
-        changing parameters, etc. based on request data.
-        
-        Args:
-            callback: Function that takes (query_params, body_params, headers, agent)
-                     and configures the agent using any available methods like:
-                     - agent.add_skill(...)
-                     - agent.add_language(...)
-                     - agent.prompt_add_section(...)
-                     - agent.set_params(...)
-                     - agent.set_global_data(...)
-                     - agent.define_tool(...)
-                     
-        Example:
-            def my_config(query_params, body_params, headers, agent):
-                if query_params.get('tier') == 'premium':
-                    agent.add_skill("advanced_search")
-                    agent.add_language("English", "en-US", "premium_voice")
-                    agent.set_params({"end_of_speech_timeout": 500})
-                agent.set_global_data({"tier": query_params.get('tier', 'standard')})
-            
-            my_agent.set_dynamic_config_callback(my_config)
-        """
-        self._dynamic_config_callback = callback
-        return self
+    # Note: set_dynamic_config_callback is implemented in WebMixin
     
     def _register_state_tracking_tools(self):
         """

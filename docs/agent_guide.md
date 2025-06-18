@@ -12,7 +12,7 @@
 - [Dynamic Agent Configuration](#dynamic-agent-configuration)
   - [Overview](#overview)
   - [Setting Up Dynamic Configuration](#setting-up-dynamic-configuration)
-  - [EphemeralAgentConfig](#ephemeralagentconfig)
+  - [Dynamic Configuration Methods](#dynamic-configuration-methods)
   - [Request Data Access](#request-data-access)
   - [Configuration Examples](#configuration-examples)
   - [Use Cases](#use-cases)
@@ -1194,7 +1194,7 @@ class MyDynamicAgent(AgentBase):
             query_params (dict): Query string parameters from the URL
             body_params (dict): Parsed JSON body from POST requests
             headers (dict): HTTP headers from the request
-            agent (EphemeralAgentConfig): Configuration object with familiar methods
+            agent (AgentBase): The agent instance to configure
         """
         # Your dynamic configuration logic here
         pass
@@ -1204,11 +1204,11 @@ The callback function receives four parameters:
 - **query_params**: Dictionary of URL query parameters
 - **body_params**: Dictionary of parsed JSON body (empty for GET requests)
 - **headers**: Dictionary of HTTP headers
-- **agent**: EphemeralAgentConfig object for configuration
+- **agent**: The agent instance to configure dynamically
 
-### EphemeralAgentConfig
+### Dynamic Configuration Methods
 
-The `agent` parameter in your callback is an `EphemeralAgentConfig` object that provides the same familiar methods as `AgentBase`, but applies them per-request:
+The `agent` parameter in your callback is the actual agent instance, allowing you to use all the same configuration methods you would use during initialization:
 
 #### Language Configuration
 ```python

@@ -569,7 +569,23 @@ def main():
                                 # Try to load this specific agent and show its tools
                                 try:
                                     specific_agent = load_agent_from_file(args.agent_path, agent_info['class_name'])
+                                    
+                                    # Apply dynamic configuration if the agent has it
+                                    # Create a basic mock request for dynamic config
+                                    try:
+                                        basic_mock_request = create_mock_request(
+                                            method="POST",
+                                            headers={},
+                                            query_params={},
+                                            body={}
+                                        )
+                                        apply_dynamic_config(specific_agent, basic_mock_request, verbose=False)
+                                    except Exception as dc_error:
+                                        if args.verbose:
+                                            print(f"    (Warning: Dynamic config failed: {dc_error})")
+                                    
                                     functions = specific_agent._tool_registry.get_all_functions() if hasattr(specific_agent, '_tool_registry') else {}
+                                    
                                     
                                     if functions:
                                         print(f"  Tools:")
@@ -583,6 +599,9 @@ def main():
                                         print(f"  Tools: (none)")
                                 except Exception as load_error:
                                     print(f"  Tools: (error loading agent: {load_error})")
+                                    if args.verbose:
+                                        import traceback
+                                        traceback.print_exc()
                         
                         print("\n" + "=" * 60)
                         print(f"\nTo use a specific agent, run:")

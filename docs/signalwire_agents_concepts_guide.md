@@ -166,7 +166,7 @@
 ### 10. Dynamic Configuration and Multi-Tenancy
 - **Dynamic Agent Configuration**
   - Per-Request Configuration Callbacks
-  - EphemeralAgentConfig System
+  - Direct Agent Configuration System
   - Request Data Access and Processing
 - **Multi-Tenant Architecture**
   - Tenant Isolation and Configuration
@@ -1682,17 +1682,17 @@ Configuration inheritance allows callbacks to modify specific aspects of agent c
 
 Caching mechanisms can be employed to optimize performance when configuration decisions are based on relatively stable data such as user profiles or organizational settings. The caching system must balance performance benefits with the need for current configuration data.
 
-#### EphemeralAgentConfig System
+#### Direct Agent Configuration System
 
-The EphemeralAgentConfig system provides a structured approach to managing temporary configuration modifications that apply only to specific requests or conversation sessions.
+The direct agent configuration system provides a structured approach to managing temporary configuration modifications that apply only to specific requests or conversation sessions.
 
-Ephemeral configurations are created dynamically and exist only for the duration of a specific interaction or session. This approach enables sophisticated customization without affecting the base agent configuration or other concurrent sessions.
+Dynamic configurations are applied directly to the agent instance for the duration of a specific request. This approach enables sophisticated customization without affecting the base agent configuration or other concurrent requests. The agent automatically resets to its baseline configuration after each request is processed.
 
-Configuration scoping ensures that ephemeral modifications are properly isolated and don't interfere with other requests or sessions. The scoping system maintains clear boundaries between different configuration contexts while enabling appropriate sharing of common resources.
+Configuration scoping ensures that per-request modifications are properly isolated and don't interfere with other requests or sessions. The scoping system maintains clear boundaries between different configuration contexts while the agent handles resource management internally.
 
-Lifecycle management handles the creation, modification, and cleanup of ephemeral configurations. This management includes automatic cleanup when sessions end and proper resource management to prevent memory leaks or resource exhaustion.
+Lifecycle management is simplified as the agent instance itself manages the application and cleanup of configurations. The agent returns to its baseline state after each request, ensuring proper resource management and preventing configuration drift.
 
-Validation and safety checks ensure that ephemeral configurations are valid and don't compromise agent security or stability. These checks include parameter validation, resource limit enforcement, and security policy compliance.
+Validation and safety checks ensure that dynamic configurations are valid and don't compromise agent security or stability. These checks include parameter validation, resource limit enforcement, and security policy compliance.
 
 #### Request Data Access and Processing
 

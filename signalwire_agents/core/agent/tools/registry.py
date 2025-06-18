@@ -96,6 +96,9 @@ class ToolRegistry:
         # These don't have handlers since they execute on SignalWire's server
         self._swaig_functions[function_name] = function_dict
         
+        # Debug logging using the module logger with proper format
+        logger.debug(f"Registered SWAIG function in registry: {function_name} (registry_id={id(self)}, agent_id={id(self.agent) if hasattr(self, 'agent') else None}, total_functions={len(self._swaig_functions)})")
+        
         logger.debug(f"Registered SWAIG function: {function_name}")
     
     def register_class_decorated_tools(self) -> None:

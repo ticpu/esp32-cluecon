@@ -182,4 +182,6 @@ class SkillManager:
         if skill_identifier in self.loaded_skills:
             return self.loaded_skills[skill_identifier]
         
-        return None 
+        return None
+    
+ 

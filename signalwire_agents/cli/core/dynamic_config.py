@@ -19,6 +19,12 @@ def apply_dynamic_config(agent: 'AgentBase', mock_request: Optional['MockRequest
         mock_request: Optional mock request object
         verbose: Whether to print verbose output
     """
+    # Check if dynamic config has already been applied to this agent
+    if hasattr(agent, '_dynamic_config_applied') and agent._dynamic_config_applied:
+        if verbose:
+            print("Dynamic configuration already applied, skipping...")
+        return
+    
     # Check if agent has dynamic config callback
     if hasattr(agent, '_dynamic_config_callback') and agent._dynamic_config_callback:
         try:
@@ -38,6 +44,9 @@ def apply_dynamic_config(agent: 'AgentBase', mock_request: Optional['MockRequest
             # Call the user's configuration callback directly with the agent
             # This is what pc_builder_service.py expects - to get the agent itself
             agent._dynamic_config_callback(query_params, body_params, headers, agent)
+            
+            # Mark that dynamic config has been applied to prevent duplicate application
+            agent._dynamic_config_applied = True
             
             if verbose:
                 print("Dynamic configuration callback applied successfully")

@@ -3,7 +3,7 @@
 """
 Comprehensive Dynamic Agent Configuration Example
 
-This example demonstrates the power of the ephemeral agent configurator pattern,
+This example demonstrates the power of dynamic agent configuration,
 showing how to dynamically configure multiple aspects of an agent based on request parameters.
 
 Features demonstrated:

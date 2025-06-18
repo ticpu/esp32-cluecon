@@ -48,14 +48,14 @@ class SimpleDynamicAgent(AgentBase):
         """
         DYNAMIC CONFIGURATION - Called fresh for every request
         
-        This method receives an EphemeralAgentConfig object that provides the same
-        familiar methods as AgentBase, but applies them per-request.
+        This method receives the agent instance directly, allowing you to
+        configure it dynamically based on the request data.
         
         Args:
             query_params: Query string parameters from the request
             body_params: POST body parameters (empty for GET requests)
             headers: HTTP headers from the request
-            agent: EphemeralAgentConfig object to configure
+            agent: The agent instance to configure
         """
         
         # EXACT SAME CONFIGURATION as the static version

@@ -104,8 +104,6 @@ class WebMixin:
                 relative_path = full_path[len(self.route.lstrip("/")):]
                 relative_path = relative_path.lstrip("/")
                 self.log.debug("relative_path_extracted", path=relative_path)
-                
-                return {"error": "Path not found"}
             
             # Log all app routes for debugging
             self.log.debug("app_routes_registered")
@@ -253,20 +251,35 @@ class WebMixin:
         # Print the auth credentials with source
         username, password, source = self.get_basic_auth_credentials(include_source=True)
         
+        # Get the proper URL using unified URL building
+        startup_url = self.get_full_url(include_auth=False)
+        
         # Log startup information using structured logging
         self.log.info("agent_starting",
                      agent=self.name,
-                     url=f"http://{host}:{port}{self.route}",
+                     url=startup_url,
                      username=username,
                      password_length=len(password),
-                     auth_source=source)
+                     auth_source=source,
+                     ssl_enabled=getattr(self, 'ssl_enabled', False))
         
         # Print user-friendly startup message (keep this for development UX)
         print(f"Agent '{self.name}' is available at:")
-        print(f"URL: http://{host}:{port}{self.route}")
+        print(f"URL: {startup_url}")
         print(f"Basic Auth: {username}:{password} (source: {source})")
         
-        uvicorn.run(self._app, host=host, port=port)
+        # Check if SSL is enabled and start uvicorn accordingly
+        if getattr(self, 'ssl_enabled', False) and getattr(self, 'ssl_cert_path', None) and getattr(self, 'ssl_key_path', None):
+            self.log.info("starting_with_ssl", cert=self.ssl_cert_path, key=self.ssl_key_path)
+            uvicorn.run(
+                self._app,
+                host=host,
+                port=port,
+                ssl_certfile=self.ssl_cert_path,
+                ssl_keyfile=self.ssl_key_path
+            )
+        else:
+            uvicorn.run(self._app, host=host, port=port)
 
     def run(self, event=None, context=None, force_mode=None, host: Optional[str] = None, port: Optional[int] = None):
         """
@@ -386,34 +399,35 @@ class WebMixin:
     
     async def _handle_root_request(self, request: Request):
         """Handle GET/POST requests to the root endpoint"""
-        # Auto-detect proxy on first request if not explicitly configured
-        if not getattr(self, '_proxy_detection_done', False) and not getattr(self, '_proxy_url_base', None):
-            # Check for proxy headers
-            forwarded_host = request.headers.get("X-Forwarded-Host")
-            forwarded_proto = request.headers.get("X-Forwarded-Proto", "http")
+        # Always detect proxy from current request headers - this allows mixing direct and proxied access
+        # Check for proxy headers
+        forwarded_host = request.headers.get("X-Forwarded-Host")
+        forwarded_proto = request.headers.get("X-Forwarded-Proto", "http")
+        
+        if forwarded_host:
+            # Set proxy_url_base on both self and super() to ensure it's shared
+            self._proxy_url_base = f"{forwarded_proto}://{forwarded_host}"
+            self._current_request = request  # Store current request for get_full_url
+            if hasattr(super(), '_proxy_url_base'):
+                # Ensure parent class has the same proxy URL
+                super()._proxy_url_base = self._proxy_url_base
             
-            if forwarded_host:
-                # Set proxy_url_base on both self and super() to ensure it's shared
-                self._proxy_url_base = f"{forwarded_proto}://{forwarded_host}"
-                if hasattr(super(), '_proxy_url_base'):
-                    # Ensure parent class has the same proxy URL
-                    super()._proxy_url_base = self._proxy_url_base
-                
-                self.log.info("proxy_auto_detected", proxy_url_base=self._proxy_url_base, 
-                             source="X-Forwarded headers")
-                self._proxy_detection_done = True
-                
-                # Also set the detection flag on parent
-                if hasattr(super(), '_proxy_detection_done'):
-                    super()._proxy_detection_done = True
-            # If no explicit proxy headers, try the parent class detection method if it exists
-            elif hasattr(super(), '_detect_proxy_from_request'):
+            self.log.debug("proxy_detected_for_request", proxy_url_base=self._proxy_url_base, 
+                         source="X-Forwarded headers")
+        else:
+            # No proxy headers - clear proxy URL to use direct access
+            self._proxy_url_base = None
+            self._current_request = request  # Store current request for get_full_url
+            if hasattr(super(), '_proxy_url_base'):
+                super()._proxy_url_base = None
+            
+            # Try the parent class detection method if it exists
+            if hasattr(super(), '_detect_proxy_from_request'):
                 # Call the parent's detection method
                 super()._detect_proxy_from_request(request)
-                # Copy the result to our class
+                # Copy the result to our class if found
                 if hasattr(super(), '_proxy_url_base') and getattr(super(), '_proxy_url_base', None):
                     self._proxy_url_base = super()._proxy_url_base
-                self._proxy_detection_done = True
         
         # Check if this is a callback path request
         callback_path = getattr(request.state, "callback_path", None)
@@ -676,9 +690,29 @@ class WebMixin:
                             debug_info = self._session_manager.debug_token(token)
                             req_log.debug("token_debug", debug=json.dumps(debug_info))
             
+            # Check if we need to use an ephemeral agent for dynamic configuration
+            agent_to_use = self
+            if self._dynamic_config_callback and request:
+                # Check query params to see if this request came from a dynamically configured agent
+                # This would have been preserved through add_swaig_query_params
+                # For example, conversation_type=chat would be in the query params
+                agent_to_use = self._create_ephemeral_copy()
+                
+                try:
+                    # Extract request data
+                    query_params = dict(request.query_params)
+                    headers = dict(request.headers)
+                    
+                    # Call the dynamic config callback with the ephemeral agent
+                    # Pass the body as body_params for context
+                    self._dynamic_config_callback(query_params, body, headers, agent_to_use)
+                    
+                except Exception as e:
+                    req_log.error("dynamic_config_error", error=str(e))
+            
             # Call the function
             try:
-                result = self.on_function_call(function_name, args, body)
+                result = agent_to_use.on_function_call(function_name, args, body)
                 
                 # Convert result to dict if needed
                 if isinstance(result, SwaigFunctionResult):
@@ -771,7 +805,9 @@ class WebMixin:
                         
             # For GET requests, return the SWML document
             if request.method == "GET":
-                swml = self._render_swml(call_id)
+                # Check if we should use dynamic config via on_swml_request
+                modifications = self.on_swml_request(None, None, request)
+                swml = self._render_swml(call_id, modifications)
                 req_log.debug("swml_rendered", swml_size=len(swml))
                 return Response(
                     content=swml,
@@ -795,17 +831,34 @@ class WebMixin:
                 req_log.error("error_parsing_request_body", error=str(e))
                 body = {}
                 
+            # Check if we need to use an ephemeral agent for dynamic configuration
+            agent_to_use = self
+            if self._dynamic_config_callback and request:
+                # Create ephemeral copy and apply dynamic config
+                agent_to_use = self._create_ephemeral_copy()
+                
+                try:
+                    # Extract request data
+                    query_params = dict(request.query_params)
+                    headers = dict(request.headers)
+                    
+                    # Call the dynamic config callback with the ephemeral agent
+                    self._dynamic_config_callback(query_params, body, headers, agent_to_use)
+                    
+                except Exception as e:
+                    req_log.error("dynamic_config_error", error=str(e))
+            
             # Extract summary from the correct location in the request
-            summary = self._find_summary_in_post_data(body, req_log)
+            summary = agent_to_use._find_summary_in_post_data(body, req_log)
             
             # Call the summary handler with the summary and the full body
             try:
                 if summary:
-                    self.on_summary(summary, body)
+                    agent_to_use.on_summary(summary, body)
                     req_log.debug("summary_handler_called_successfully")
                 else:
                     # If no summary found but still want to process the data
-                    self.on_summary(None, body)
+                    agent_to_use.on_summary(None, body)
                     req_log.debug("summary_handler_called_with_null_summary")
             except Exception as e:
                 req_log.error("error_in_summary_handler", error=str(e))
@@ -879,22 +932,6 @@ class WebMixin:
                 media_type="application/json"
             )
     
-    def _render_swml(self, call_id: str = None, modifications: Optional[dict] = None) -> str:
-        """
-        Render the complete SWML document using SWMLService methods
-        
-        Args:
-            call_id: Optional call ID for session-specific tokens
-            modifications: Optional dict of modifications to apply to the SWML
-            
-        Returns:
-            SWML document as a string
-        """
-        # This method implementation would normally be part of the agent_base.py
-        # The actual rendering logic should remain in agent_base.py
-        # This is just a placeholder that would call the actual implementation
-        raise NotImplementedError("_render_swml must be implemented in AgentBase")
-    
     def on_request(self, request_data: Optional[dict] = None, callback_path: Optional[str] = None) -> Optional[dict]:
         """
         Called when SWML is requested, with request data when available
@@ -928,23 +965,23 @@ class WebMixin:
         Returns:
             Optional dict with modifications to apply to the SWML document
         """
-        # Handle dynamic configuration callback if set
-        if self._dynamic_config_callback and request:
-            try:
-                # Extract request data
-                query_params = dict(request.query_params)
-                body_params = request_data or {}
-                headers = dict(request.headers)
-                
-                # Call the user's configuration callback with the actual agent instance
-                # This allows FULL dynamic configuration including adding skills
-                self._dynamic_config_callback(query_params, body_params, headers, self)
-                
-            except Exception as e:
-                self.log.error("dynamic_config_error", error=str(e))
+        # Dynamic config is handled differently now - we don't modify the agent here
+        # Instead, we'll return a marker that tells _render_swml to use an ephemeral copy
+        # UNLESS we're already on an ephemeral agent (to prevent infinite recursion)
+        # 
+        # IMPORTANT: We ALWAYS return the marker if we have a dynamic config callback,
+        # even if request is None. This ensures the first request gets dynamic config too.
+        self.log.debug("on_swml_request_called", 
+                      has_dynamic_callback=bool(self._dynamic_config_callback),
+                      is_ephemeral=getattr(self, '_is_ephemeral', False),
+                      has_request=bool(request))
+        
+        if self._dynamic_config_callback and not getattr(self, '_is_ephemeral', False):
+            # Return a special marker that _render_swml will recognize
+            self.log.debug("returning_ephemeral_marker")
+            return {"__use_ephemeral_agent": True, "__request": request, "__request_data": request_data}
         
         # Return None to indicate no SWML modifications needed
-        # (The callback has already modified the agent directly)
         return None
 
     def register_routing_callback(self, callback_fn: Callable[[Request, Dict[str, Any]], Optional[str]], 
@@ -1059,53 +1096,6 @@ class WebMixin:
         signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
         
         self.log.debug("graceful_shutdown_handlers_registered")
-
-    def _find_summary_in_post_data(self, body, logger):
-        """
-        Attempt to find a summary in the post-prompt response data
-        
-        Args:
-            body: The request body
-            logger: Logger instance
-            
-        Returns:
-            Summary data or None if not found
-        """
-        # This method implementation would normally be part of the agent_base.py
-        # The actual logic should remain in agent_base.py
-        # This is just a placeholder that would call the actual implementation
-        raise NotImplementedError("_find_summary_in_post_data must be implemented in AgentBase")
-
-    def _build_webhook_url(self, endpoint: str, query_params: Optional[Dict[str, str]] = None) -> str:
-        """
-        Helper method to build webhook URLs consistently
-        
-        Args:
-            endpoint: The endpoint path (e.g., "swaig", "post_prompt")
-            query_params: Optional query parameters to append
-            
-        Returns:
-            Fully constructed webhook URL
-        """
-        # This method implementation would normally be part of the agent_base.py
-        # The actual logic should remain in agent_base.py
-        # This is just a placeholder that would call the actual implementation
-        raise NotImplementedError("_build_webhook_url must be implemented in AgentBase")
-
-    def _check_basic_auth(self, request: Request) -> bool:
-        """
-        Check basic auth from a request
-        
-        Args:
-            request: FastAPI request object
-            
-        Returns:
-            True if auth is valid, False otherwise
-        """
-        # This method implementation would normally be part of the agent_base.py
-        # The actual logic should remain in agent_base.py
-        # This is just a placeholder that would call the actual implementation
-        raise NotImplementedError("_check_basic_auth must be implemented in AgentBase")
 
     def enable_debug_routes(self) -> 'AgentBase':
         """

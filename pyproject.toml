@@ -35,6 +35,7 @@ dependencies = [
     "uvicorn==0.34.2",
     "beautifulsoup4==4.12.3",
     "pytz==2023.3",
+    "lxml>=4.9.0",
 ]
 
 # Optional dependencies for search functionality

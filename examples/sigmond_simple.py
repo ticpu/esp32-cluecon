@@ -266,7 +266,7 @@ class SigmondSimple(AgentBase):
             "Use set_dynamic_config_callback to register a function that configures the agent for each request.",
             "Access query parameters, body parameters, and headers to customize agent behavior.",
             "Perfect for multi-tenant applications, A/B testing, personalization, and localization.",
-            "The EphemeralAgentConfig object provides the same methods as AgentBase but applies them per-request.",
+            "The agent parameter allows you to configure the agent dynamically per-request.",
             "Supports different service tiers, languages, customer-specific configurations, and feature flags."
         ])
         

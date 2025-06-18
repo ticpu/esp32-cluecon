@@ -9,6 +9,4 @@ See LICENSE file in the project root for full license information.
 
 """Agent refactored components."""
 
-from .config.ephemeral import EphemeralAgentConfig
-
-__all__ = ['EphemeralAgentConfig']
+__all__ = []

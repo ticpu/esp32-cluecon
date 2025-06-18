@@ -43,10 +43,16 @@ The SWML Transfer skill provides a flexible way to implement call transfers betw
 Each entry in the `transfers` dictionary should have:
 - **Pattern (key)**: Regex pattern to match (e.g., "/sales/i" for case-insensitive)
 - **Configuration (value)**: Dictionary with:
-  - `url` (required): Transfer destination URL
+  - **One of these required**:
+    - `url`: Transfer to SWML endpoint (uses swml_transfer action)
+    - `address`: Transfer to phone/SIP address (uses connect action)
   - `message` (optional): Pre-transfer message
-  - `return_message` (optional): Post-transfer message
+  - `return_message` (optional): Post-transfer message (only used when `final` is False)
   - `post_process` (optional): Boolean for post-processing (default: True)
+  - `final` (optional): Boolean for permanent transfer (default: True)
+    - `True`: Permanent transfer - call exits agent completely (default)
+    - `False`: Temporary transfer - control returns after transfer completes
+  - `from_addr` (optional): Caller ID override for connect action (only with `address`)
 
 ## Usage
 
@@ -94,23 +100,124 @@ self.add_skill("swml_transfer", {
             "url": "https://api.company.com/sales-agent",
             "message": "I'll connect you with our sales team for pricing and billing questions.",
             "return_message": "Thank you for contacting our sales department.",
-            "post_process": True
+            "post_process": True,
+            "final": False  # Temporary transfer - returns control
         },
         "/support|technical|help/i": {
             "url": "https://api.company.com/support-agent",
             "message": "Let me transfer you to our technical support team.",
             "return_message": "I hope we were able to resolve your technical issue.",
-            "post_process": True
+            "post_process": True,
+            "final": False  # Temporary transfer - returns control
         },
         "/manager|supervisor/i": {
             "url": "https://api.company.com/manager-agent",
             "message": "I understand you'd like to speak with a manager. One moment please.",
             "return_message": "Thank you for your patience.",
-            "post_process": False
+            "post_process": False,
+            "final": False  # Temporary transfer - returns control
+        },
+        "/disconnect|goodbye/i": {
+            "url": "https://api.company.com/closing-agent",
+            "message": "Thank you for calling. Goodbye!",
+            "post_process": True,
+            "final": True  # Permanent transfer - exits this agent completely
         }
     },
     "default_message": "I can transfer you to sales, support, or a manager. Which would you prefer?",
     "default_post_process": False
+})
+```
+
+### Permanent vs Temporary Transfers
+
+```python
+# Permanent transfer example - call exits agent completely
+self.add_skill("swml_transfer", {
+    "tool_name": "permanent_transfer",
+    "transfers": {
+        "/billing/i": {
+            "url": "https://example.com/billing-specialist",
+            "message": "I'll transfer you to our billing specialist. Goodbye!",
+            "final": True  # Call won't return to this agent
+        }
+    }
+})
+
+# Temporary transfer example - call returns after transfer
+self.add_skill("swml_transfer", {
+    "tool_name": "temporary_transfer",
+    "transfers": {
+        "/specialist/i": {
+            "url": "https://example.com/specialist",
+            "message": "Let me connect you with a specialist.",
+            "return_message": "Welcome back! Is there anything else I can help with?",
+            "final": False  # Call returns to this agent after transfer
+        }
+    }
+})
+```
+
+### Phone Number and SIP Address Transfers
+
+```python
+# Transfer to phone numbers and SIP addresses using 'address'
+self.add_skill("swml_transfer", {
+    "tool_name": "direct_transfer",
+    "transfers": {
+        "/emergency/i": {
+            "address": "+15551234567",  # Phone number
+            "message": "Transferring you to our emergency line.",
+            "final": True
+        },
+        "/voicemail/i": {
+            "address": "sip:voicemail@company.com",  # SIP address
+            "message": "Transferring to voicemail.",
+            "from_addr": "+15559876543",  # Optional caller ID
+            "final": True
+        },
+        "/callback/i": {
+            "address": "+15551111111",
+            "message": "I'll connect you for a callback.",
+            "return_message": "The callback is complete. Anything else?",
+            "final": False  # Temporary transfer
+        }
+    }
+})
+```
+
+### Mixed Transfer Types
+
+```python
+# Mix SWML endpoints and direct addresses in one skill
+self.add_skill("swml_transfer", {
+    "tool_name": "transfer",
+    "transfers": {
+        # SWML agent transfers
+        "/sales|billing/i": {
+            "url": "https://api.company.com/sales-agent",
+            "message": "Transferring to our sales team.",
+            "final": False
+        },
+        "/support/i": {
+            "url": "https://api.company.com/support-agent",
+            "message": "Transferring to technical support.",
+            "final": False
+        },
+        # Direct phone transfers
+        "/operator/i": {
+            "address": "+18005551234",
+            "message": "Connecting you with an operator.",
+            "final": True
+        },
+        # SIP transfers
+        "/conference/i": {
+            "address": "sip:conference@company.com",
+            "message": "Joining you to the conference.",
+            "from_addr": "+15559876543",
+            "final": True
+        }
+    }
 })
 ```
 
