@@ -31,6 +31,7 @@ class SWAIGFunction:
         secure: bool = False,
         fillers: Optional[Dict[str, List[str]]] = None,
         webhook_url: Optional[str] = None,
+        required: Optional[List[str]] = None,
         **extra_swaig_fields
     ):
         """
@@ -44,6 +45,7 @@ class SWAIGFunction:
             secure: Whether this function requires token validation
             fillers: Optional dictionary of filler phrases by language code
             webhook_url: Optional external webhook URL to use instead of local handling
+            required: Optional list of required parameter names
             **extra_swaig_fields: Additional SWAIG fields to include in function definition
         """
         self.name = name
@@ -53,6 +55,7 @@ class SWAIGFunction:
         self.secure = secure
         self.fillers = fillers
         self.webhook_url = webhook_url
+        self.required = required or []
         self.extra_swaig_fields = extra_swaig_fields
         
         # Mark as external if webhook_url is provided
@@ -73,10 +76,16 @@ class SWAIGFunction:
             return self.parameters
             
         # Otherwise, wrap the parameters in the expected structure
-        return {
+        result = {
             "type": "object",
             "properties": self.parameters
         }
+        
+        # Add required fields if specified
+        if self.required:
+            result["required"] = self.required
+            
+        return result
         
     def __call__(self, *args, **kwargs):
         """

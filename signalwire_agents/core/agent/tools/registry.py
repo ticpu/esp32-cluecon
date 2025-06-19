@@ -41,6 +41,7 @@ class ToolRegistry:
         secure: bool = True,
         fillers: Optional[Dict[str, List[str]]] = None,
         webhook_url: Optional[str] = None,
+        required: Optional[List[str]] = None,
         **swaig_fields
     ) -> None:
         """
@@ -54,6 +55,7 @@ class ToolRegistry:
             secure: Whether to require token validation
             fillers: Optional dict mapping language codes to arrays of filler phrases
             webhook_url: Optional external webhook URL to use instead of local handling
+            required: Optional list of required parameter names
             **swaig_fields: Additional SWAIG fields to include in function definition
             
         Raises:
@@ -70,6 +72,7 @@ class ToolRegistry:
             secure=secure,
             fillers=fillers,
             webhook_url=webhook_url,
+            required=required,
             **swaig_fields
         )
         
@@ -130,6 +133,7 @@ class ToolRegistry:
                     secure = tool_params_copy.pop("secure", True)
                     fillers = tool_params_copy.pop("fillers", None)
                     webhook_url = tool_params_copy.pop("webhook_url", None)
+                    required = tool_params_copy.pop("required", None)
                     
                     # Register the tool with any remaining params as swaig_fields
                     self.define_tool(
@@ -140,6 +144,7 @@ class ToolRegistry:
                         secure=secure,
                         fillers=fillers,
                         webhook_url=webhook_url,
+                        required=required,
                         **tool_params_copy  # Pass through any additional swaig_fields
                     )
                     

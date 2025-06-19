@@ -101,7 +101,7 @@ search-all = [
 Homepage = "https://github.com/signalwire/signalwire-agents"
 
 [project.scripts]
-swaig-test = "signalwire_agents.cli.test_swaig:console_entry_point"
+swaig-test = "signalwire_agents.cli.test_swaig_main:main"
 sw-search = "signalwire_agents.cli.build_search:console_entry_point"
 
 [tool.setuptools]

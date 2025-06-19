@@ -6,10 +6,10 @@ This tool loads an agent application and calls SWAIG functions with comprehensiv
 simulation of the SignalWire environment. It supports both webhook and DataMap functions.
 """
 
-# CRITICAL: Set environment variable BEFORE any imports to suppress logs for --raw
+# CRITICAL: Set environment variable BEFORE any imports to suppress logs for --raw and --dump-swml
 import sys
 import os
-if "--raw" in sys.argv:
+if "--raw" in sys.argv or "--dump-swml" in sys.argv:
     os.environ['SIGNALWIRE_LOG_MODE'] = 'off'
 
 import json
@@ -770,6 +770,9 @@ def main():
 
 def console_entry_point():
     """Console script entry point for pip installation"""
+    # Check for --dump-swml or --raw BEFORE imports happen
+    if "--raw" in sys.argv or "--dump-swml" in sys.argv:
+        os.environ['SIGNALWIRE_LOG_MODE'] = 'off'
     sys.exit(main())
 
 

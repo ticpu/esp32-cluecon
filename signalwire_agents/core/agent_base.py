@@ -287,7 +287,7 @@ class AgentBase(
             Full URL including host, port, and route (with auth if requested)
         """
         mode = get_execution_mode()
-        
+
         if mode == 'cgi':
             protocol = 'https' if os.getenv('HTTPS') == 'on' else 'http'
             host = os.getenv('HTTP_HOST') or os.getenv('SERVER_NAME') or 'localhost'
@@ -649,10 +649,7 @@ class AgentBase(
                 function_entry = {
                     "function": name,
                     "description": func.description,
-                    "parameters": {
-                        "type": "object",
-                        "properties": func.parameters
-                    }
+                    "parameters": func._ensure_parameter_structure()
                 }
                 
                 # Add fillers if present
@@ -843,7 +840,7 @@ class AgentBase(
         """
         # Check for serverless environment and use appropriate URL generation
         mode = get_execution_mode()
-        
+
         if mode != 'server':
             # In serverless mode, use the serverless-appropriate URL with auth
             base_url = self.get_full_url(include_auth=True)
@@ -865,57 +862,9 @@ class AgentBase(
             
             return url
         
-        # Server mode - use existing logic with proxy/auth support
-        # Base URL construction
-        if hasattr(self, '_proxy_url_base') and self._proxy_url_base:
-            # For proxy URLs
-            base = self._proxy_url_base.rstrip('/')
-            
-            # Always add auth credentials
-            username, password = self._basic_auth
-            url = urlparse(base)
-            base = url._replace(netloc=f"{username}:{password}@{url.netloc}").geturl()
-        else:
-            # Determine protocol based on SSL settings
-            protocol = "https" if getattr(self, 'ssl_enabled', False) else "http"
-            
-            # Determine host part - include port unless it's the standard port for the protocol
-            if getattr(self, 'ssl_enabled', False) and getattr(self, 'domain', None):
-                # Use domain, but include port if it's not the standard HTTPS port (443)
-                host_part = f"{self.domain}:{self.port}" if self.port != 443 else self.domain
-            else:
-                # For local URLs
-                if self.host in ("0.0.0.0", "127.0.0.1", "localhost"):
-                    host = "localhost"
-                else:
-                    host = self.host
-                
-                host_part = f"{host}:{self.port}"
-                
-            # Always include auth credentials
-            username, password = self._basic_auth
-            base = f"{protocol}://{username}:{password}@{host_part}"
-        
-        # Ensure the endpoint has a trailing slash to prevent redirects
-        if endpoint in ["swaig", "post_prompt"]:
-            endpoint = f"{endpoint}/"
-            
-        # Simple path - use the route directly with the endpoint
-        path = f"{self.route}/{endpoint}"
-            
-        # Construct full URL
-        url = f"{base}{path}"
-        
-        # Add query parameters if any (only if they have values)
-        # But NEVER add call_id parameter - it should be in the body, not the URL
-        if query_params:
-            # Remove any call_id from query params
-            filtered_params = {k: v for k, v in query_params.items() if k != "call_id" and v}
-            if filtered_params:
-                params = "&".join([f"{k}={v}" for k, v in filtered_params.items()])
-                url = f"{url}?{params}"
-            
-        return url
+        # Server mode - use the parent class's implementation from SWMLService
+        # which properly handles SWML_PROXY_URL_BASE environment variable
+        return super()._build_webhook_url(endpoint, query_params)
     
     def _find_summary_in_post_data(self, body, logger):
         """

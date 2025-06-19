@@ -399,27 +399,48 @@ class WebMixin:
     
     async def _handle_root_request(self, request: Request):
         """Handle GET/POST requests to the root endpoint"""
+        # Debug logging to understand the state before any changes
+        self.log.debug("_handle_root_request entry",
+                      proxy_url_base=getattr(self, '_proxy_url_base', None),
+                      proxy_url_base_from_env=getattr(self, '_proxy_url_base_from_env', False),
+                      env_var=os.environ.get('SWML_PROXY_URL_BASE'))
+        
         # Always detect proxy from current request headers - this allows mixing direct and proxied access
         # Check for proxy headers
         forwarded_host = request.headers.get("X-Forwarded-Host")
         forwarded_proto = request.headers.get("X-Forwarded-Proto", "http")
         
         if forwarded_host:
-            # Set proxy_url_base on both self and super() to ensure it's shared
-            self._proxy_url_base = f"{forwarded_proto}://{forwarded_host}"
-            self._current_request = request  # Store current request for get_full_url
-            if hasattr(super(), '_proxy_url_base'):
-                # Ensure parent class has the same proxy URL
-                super()._proxy_url_base = self._proxy_url_base
-            
-            self.log.debug("proxy_detected_for_request", proxy_url_base=self._proxy_url_base, 
-                         source="X-Forwarded headers")
+            # Only update proxy URL if it wasn't set from environment
+            if not getattr(self, '_proxy_url_base_from_env', False):
+                # Set proxy_url_base on both self and super() to ensure it's shared
+                self._proxy_url_base = f"{forwarded_proto}://{forwarded_host}"
+                self._current_request = request  # Store current request for get_full_url
+                if hasattr(super(), '_proxy_url_base'):
+                    # Ensure parent class has the same proxy URL
+                    super()._proxy_url_base = self._proxy_url_base
+                
+                self.log.debug("proxy_detected_for_request", proxy_url_base=self._proxy_url_base, 
+                             source="X-Forwarded headers")
+            else:
+                self.log.debug("proxy headers present but keeping env proxy URL",
+                             forwarded_proto=forwarded_proto,
+                             forwarded_host=forwarded_host,
+                             keeping_proxy_url=self._proxy_url_base,
+                             source="environment variable")
         else:
-            # No proxy headers - clear proxy URL to use direct access
-            self._proxy_url_base = None
+            # No proxy headers - only clear proxy URL if it wasn't set from environment
+            if not getattr(self, '_proxy_url_base_from_env', False):
+                self.log.debug("No proxy headers found, clearing proxy URL",
+                             proxy_url_base_from_env=getattr(self, '_proxy_url_base_from_env', False))
+                self._proxy_url_base = None
+                if hasattr(super(), '_proxy_url_base'):
+                    super()._proxy_url_base = None
+            else:
+                self.log.debug("No proxy headers found, but keeping env proxy URL",
+                             proxy_url_base=getattr(self, '_proxy_url_base', None),
+                             proxy_url_base_from_env=True)
             self._current_request = request  # Store current request for get_full_url
-            if hasattr(super(), '_proxy_url_base'):
-                super()._proxy_url_base = None
             
             # Try the parent class detection method if it exists
             if hasattr(super(), '_detect_proxy_from_request'):

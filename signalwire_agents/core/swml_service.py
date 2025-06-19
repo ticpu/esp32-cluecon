@@ -90,17 +90,17 @@ class SWMLService:
         self.ssl_cert_path = os.environ.get('SWML_SSL_CERT_PATH')
         self.ssl_key_path = os.environ.get('SWML_SSL_KEY_PATH')
         
+        # Initialize logger for this instance FIRST before using it
+        self.log = logger.bind(service=name)
+        
         # Initialize proxy detection attributes
         self._proxy_url_base = os.environ.get('SWML_PROXY_URL_BASE')
+        self._proxy_url_base_from_env = bool(self._proxy_url_base)  # Track if it came from environment
         if self._proxy_url_base:
-            self.log.warning("SWML_PROXY_URL_BASE is set in environment", 
-                           proxy_url_base=self._proxy_url_base,
-                           message="This overrides SSL configuration and port settings. Remove this variable to use automatic detection.")
+            self.log.warning("SWML_PROXY_URL_BASE is set in environment - This overrides SSL configuration and port settings. Remove this variable to use automatic detection.", 
+                           proxy_url_base=self._proxy_url_base)
         self._proxy_detection_done = False
         self._proxy_debug = os.environ.get('SWML_PROXY_DEBUG', '').lower() in ('true', '1', 'yes')
-        
-        # Initialize logger for this instance
-        self.log = logger.bind(service=name)
         self.log.info("service_initializing", route=self.route, host=host, port=port)
         
         # Set basic auth credentials
@@ -958,10 +958,20 @@ class SWMLService:
         Returns:
             Base URL string (protocol://[auth@]host[:port])
         """
+        # Debug logging to understand state
+        self.log.debug("_get_base_url called",
+                      has_proxy_url_base=hasattr(self, '_proxy_url_base'),
+                      proxy_url_base=getattr(self, '_proxy_url_base', None),
+                      proxy_url_base_from_env=getattr(self, '_proxy_url_base_from_env', False),
+                      env_var=os.environ.get('SWML_PROXY_URL_BASE'),
+                      include_auth=include_auth,
+                      caller=inspect.stack()[1].function if len(inspect.stack()) > 1 else "unknown")
+        
         # Check if we have proxy information from a request
         if hasattr(self, '_proxy_url_base') and self._proxy_url_base:
             base = self._proxy_url_base.rstrip('/')
-            
+            self.log.debug("Using proxy URL base", proxy_url_base=base)
+
             # Add auth credentials if requested
             if include_auth:
                 username, password = self._basic_auth
@@ -1030,7 +1040,7 @@ class SWMLService:
         """
         # Get base URL using central method
         base = self._get_base_url(include_auth=include_auth)
-        
+
         # Build path
         if endpoint:
             # Ensure endpoint doesn't start with slash
@@ -1066,6 +1076,12 @@ class SWMLService:
         Returns:
             Fully constructed webhook URL
         """
+        self.log.debug("_build_webhook_url called",
+                      endpoint=endpoint,
+                      query_params=query_params,
+                      proxy_url_base=getattr(self, '_proxy_url_base', None),
+                      proxy_url_base_from_env=getattr(self, '_proxy_url_base_from_env', False))
+        
         # Use the central URL building method
         return self._build_full_url(endpoint=endpoint, include_auth=True, query_params=query_params) 
 
@@ -1077,6 +1093,10 @@ class SWMLService:
         Args:
             request: FastAPI Request object
         """
+        # If SWML_PROXY_URL_BASE was already set (e.g., from environment), don't override it
+        if self._proxy_url_base:
+            return
+            
         # First check for standard X-Forwarded headers (used by most proxies including ngrok)
         forwarded_host = request.headers.get("X-Forwarded-Host")
         forwarded_proto = request.headers.get("X-Forwarded-Proto", "http")

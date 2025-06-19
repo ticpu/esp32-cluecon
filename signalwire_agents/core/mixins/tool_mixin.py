@@ -29,6 +29,7 @@ class ToolMixin:
         secure: bool = True,
         fillers: Optional[Dict[str, List[str]]] = None,
         webhook_url: Optional[str] = None,
+        required: Optional[List[str]] = None,
         **swaig_fields
     ) -> 'AgentBase':
         """
@@ -42,6 +43,7 @@ class ToolMixin:
             secure: Whether to require token validation
             fillers: Optional dict mapping language codes to arrays of filler phrases
             webhook_url: Optional external webhook URL to use instead of local handling
+            required: Optional list of required parameter names
             **swaig_fields: Additional SWAIG fields to include in function definition
             
         Returns:
@@ -55,6 +57,7 @@ class ToolMixin:
             secure=secure,
             fillers=fillers,
             webhook_url=webhook_url,
+            required=required,
             **swaig_fields
         )
         return self

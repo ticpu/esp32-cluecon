@@ -50,6 +50,7 @@ class ToolDecorator:
                 secure = kwargs.pop("secure", True)
                 fillers = kwargs.pop("fillers", None)
                 webhook_url = kwargs.pop("webhook_url", None)
+                required = kwargs.pop("required", None)
                 
                 registry.define_tool(
                     name=name,
@@ -59,6 +60,7 @@ class ToolDecorator:
                     secure=secure,
                     fillers=fillers,
                     webhook_url=webhook_url,
+                    required=required,
                     **kwargs  # Pass through any additional swaig_fields
                 )
                 return func

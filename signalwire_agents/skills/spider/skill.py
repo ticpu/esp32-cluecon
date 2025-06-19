@@ -105,24 +105,12 @@ class SpiderSkill(SkillBase):
             name=f"{tool_prefix}scrape_url",
             description="Extract text content from a single web page",
             parameters={
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "The URL to scrape"
-                    },
-                    "extract_type": {
-                        "type": "string",
-                        "description": "Type of extraction: fast_text, markdown, structured",
-                        "enum": ["fast_text", "markdown", "structured"]
-                    },
-                    "selectors": {
-                        "type": "object",
-                        "description": "CSS/XPath selectors for specific elements (optional)"
-                    }
-                },
-                "required": ["url"]
+                "url": {
+                    "type": "string",
+                    "description": "The URL to scrape"
+                }
             },
+            required=["url"],
             handler=self._scrape_url_handler,
             **self.swaig_fields
         )
@@ -132,28 +120,12 @@ class SpiderSkill(SkillBase):
             name=f"{tool_prefix}crawl_site",
             description="Crawl multiple pages starting from a URL",
             parameters={
-                "type": "object",
-                "properties": {
-                    "start_url": {
-                        "type": "string",
-                        "description": "Starting URL for the crawl"
-                    },
-                    "max_depth": {
-                        "type": "integer",
-                        "description": "How many links deep to crawl"
-                    },
-                    "follow_patterns": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of regex patterns for URLs to follow"
-                    },
-                    "max_pages": {
-                        "type": "integer",
-                        "description": "Maximum number of pages to crawl"
-                    }
-                },
-                "required": ["start_url"]
+                "start_url": {
+                    "type": "string",
+                    "description": "Starting URL for the crawl"
+                }
             },
+            required=["start_url"],
             handler=self._crawl_site_handler,
             **self.swaig_fields
         )
@@ -163,19 +135,12 @@ class SpiderSkill(SkillBase):
             name=f"{tool_prefix}extract_structured_data",
             description="Extract specific data from a web page using selectors",
             parameters={
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "The URL to scrape"
-                    },
-                    "selectors": {
-                        "type": "object",
-                        "description": "Dictionary mapping field names to CSS/XPath selectors"
-                    }
-                },
-                "required": ["url", "selectors"]
+                "url": {
+                    "type": "string",
+                    "description": "The URL to scrape"
+                }
             },
+            required=["url"],
             handler=self._extract_structured_handler,
             **self.swaig_fields
         )
@@ -344,12 +309,13 @@ class SpiderSkill(SkillBase):
         if not response:
             return SwaigFunctionResult(f"Failed to fetch {url}")
         
-        # Extract content based on type
-        extract_type = args.get('extract_type', self.extract_type)
-        selectors = args.get('selectors')
+        # Extract content based on configured type (not from args)
+        extract_type = self.extract_type
         
         try:
-            if extract_type == 'structured' or selectors:
+            if extract_type == 'structured':
+                # For structured extraction, use predefined selectors from config if available
+                selectors = self.params.get('selectors', {})
                 result = self._structured_extract(response, selectors)
                 return SwaigFunctionResult(f"Extracted structured data from {url}: {result}")
             elif extract_type == 'markdown':
@@ -376,10 +342,10 @@ class SpiderSkill(SkillBase):
         if not start_url:
             return SwaigFunctionResult("Please provide a starting URL for the crawl")
         
-        # Parse crawl parameters
-        max_depth = args.get('max_depth', self.max_depth)
-        max_pages = args.get('max_pages', self.max_pages)
-        follow_patterns = args.get('follow_patterns', [])
+        # Use configured parameters (not from args)
+        max_depth = self.max_depth
+        max_pages = self.max_pages
+        follow_patterns = self.params.get('follow_patterns', [])
         
         # Validate parameters
         if max_depth < 0:
@@ -464,12 +430,14 @@ class SpiderSkill(SkillBase):
     def _extract_structured_handler(self, args: Dict[str, Any], raw_data: Dict[str, Any]) -> SwaigFunctionResult:
         """Handle structured data extraction."""
         url = args.get('url', '').strip()
-        selectors = args.get('selectors', {})
         
         if not url:
             return SwaigFunctionResult("Please provide a URL")
+        
+        # Use configured selectors from params
+        selectors = self.params.get('selectors', {})
         if not selectors:
-            return SwaigFunctionResult("Please provide selectors for data extraction")
+            return SwaigFunctionResult("No selectors configured for structured data extraction")
         
         # Fetch the page
         response = self._fetch_url(url)
