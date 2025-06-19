@@ -111,6 +111,16 @@ class SkillManager:
             self.logger.info(f"Successfully loaded skill instance '{instance_key}' (skill: '{skill_name}')")
             return True, ""
             
+        except ValueError as e:
+            # Check if this is a duplicate tool registration (expected during agent cloning)
+            if "already exists" in str(e):
+                debug_msg = f"Skill '{skill_name}' already loaded, skipping duplicate registration"
+                self.logger.debug(debug_msg)
+                return True, ""  # Not an error, skill is already available
+            else:
+                error_msg = f"Error loading skill '{skill_name}': {e}"
+                self.logger.error(error_msg)
+                return False, error_msg
         except Exception as e:
             error_msg = f"Error loading skill '{skill_name}': {e}"
             self.logger.error(error_msg)
