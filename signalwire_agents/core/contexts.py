@@ -205,6 +205,7 @@ class Step:
     def to_dict(self) -> Dict[str, Any]:
         """Convert step to dictionary for SWML generation"""
         step_dict = {
+            "name": self.name,
             "text": self._render_text()
         }
         
