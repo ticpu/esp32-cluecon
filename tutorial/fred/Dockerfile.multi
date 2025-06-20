@@ -1,0 +1,50 @@
+# Stage 1: Build environment
+FROM python:3.9-slim as builder
+
+# Set working directory
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies to a specific directory
+RUN pip install --no-cache-dir --target=/app/deps -r requirements.txt
+
+# Stage 2: Runtime environment
+FROM python:3.9-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/deps:$PYTHONPATH
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependencies from builder
+COPY --from=builder /app/deps /app/deps
+
+# Copy application
+COPY fred.py .
+
+# Create non-root user
+RUN useradd -m -u 1000 freduser && chown -R freduser:freduser /app
+
+# Switch to non-root user
+USER freduser
+
+# Expose port
+EXPOSE 3000
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:3000/health').read()"
+
+# Run Fred
+CMD ["python", "fred.py"]

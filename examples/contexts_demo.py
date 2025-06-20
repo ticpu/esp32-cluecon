@@ -174,7 +174,7 @@ class AdvancedContextsDemoAgent(AgentBase):
             "Wonderful! Progressing to the next step..."
         ])
         
-        self.add_internal_filler("context_switch", "en-US", [
+        self.add_internal_filler("change_context", "en-US", [
             "Let me connect you with the right department...",
             "I'm transferring you to a specialist...",
             "One moment while I get the right person...",
