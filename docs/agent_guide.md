@@ -1724,52 +1724,134 @@ Dynamic agent configuration is a powerful feature that enables sophisticated, mu
 
 ## Advanced Features
 
-### State Management
+### Session Lifecycle Hooks
 
-Enable state tracking to persist information across interactions:
+SignalWire provides special SWAIG functions that are automatically called at specific points during a voice session's lifecycle. These hooks enable you to perform initialization tasks when a call starts and cleanup tasks when a call ends.
+
+#### Overview
+
+Session lifecycle hooks are special SWAIG functions that SignalWire calls automatically:
+- `startup_hook`: Called immediately when a new voice session begins
+- `hangup_hook`: Called when a voice session ends (regardless of how it ended)
+
+These hooks are particularly useful for:
+- Initializing session state or resources
+- Loading user preferences or history
+- Logging session start/end events
+- Cleaning up temporary resources
+- Saving session data for analytics
+
+#### Implementation
+
+To implement lifecycle hooks, define them as regular SWAIG functions with these specific names:
 
 ```python
-# Enable state tracking in the constructor
-super().__init__(
-    name="stateful-agent",
-    enable_state_tracking=True  # Automatically registers startup_hook and hangup_hook
-)
+from signalwire_agents import AgentBase, SwaigFunctionResult
 
-# Access and update state
-@AgentBase.tool(
-    name="save_preference",
-    description="Save a user preference",
-    parameters={
-        "key": {
-            "type": "string",
-            "description": "The preference key"
-        },
-        "value": {
-            "type": "string",
-            "description": "The preference value"
-        }
-    }
-)
-def save_preference(self, args, raw_data):
-    # Get the call ID from the raw data
-    call_id = raw_data.get("call_id")
+class MyAgent(AgentBase):
+    def __init__(self):
+        super().__init__(name="my-agent")
     
-    if call_id:
-        # Get current state or empty dict if none exists
-        state = self.get_state(call_id) or {}
+    @AgentBase.tool(
+        name="startup_hook",
+        description="Called when the voice session starts"
+    )
+    def startup_hook(self, args, raw_data):
+        # Extract session information
+        call_id = raw_data.get("call_id")
+        from_number = raw_data.get("from_number")
+        to_number = raw_data.get("to_number")
         
-        # Update the state
-        preferences = state.get("preferences", {})
-        preferences[args.get("key")] = args.get("value")
-        state["preferences"] = preferences
+        # Initialize session state
+        self.update_state(call_id, {
+            "session_start": datetime.now().isoformat(),
+            "from": from_number,
+            "to": to_number,
+            "interaction_count": 0
+        })
         
-        # Save the updated state
-        self.update_state(call_id, state)
+        # Log session start
+        print(f"Session started: {call_id} from {from_number}")
         
-        return SwaigFunctionResult("Preference saved")
-    else:
-        return SwaigFunctionResult("Could not save preference: No call ID")
+        # Return success (SignalWire expects a response)
+        return SwaigFunctionResult("Session initialized successfully")
+    
+    @AgentBase.tool(
+        name="hangup_hook",
+        description="Called when the voice session ends"
+    )
+    def hangup_hook(self, args, raw_data):
+        # Extract session information
+        call_id = raw_data.get("call_id")
+        
+        # Retrieve session state
+        state = self.get_state(call_id)
+        
+        if state:
+            # Calculate session duration
+            start_time = datetime.fromisoformat(state.get("session_start"))
+            duration = (datetime.now() - start_time).total_seconds()
+            
+            # Log session metrics
+            print(f"Session ended: {call_id}")
+            print(f"Duration: {duration} seconds")
+            print(f"Interactions: {state.get('interaction_count', 0)}")
+            
+            # Clean up state (optional - SignalWire will clean up automatically)
+            self.delete_state(call_id)
+        
+        return SwaigFunctionResult("Session cleanup completed")
 ```
+
+#### Common Use Cases
+
+##### 1. User Preference Loading
+```python
+@AgentBase.tool(name="startup_hook")
+def startup_hook(self, args, raw_data):
+    caller_id = raw_data.get("from_number")
+    
+    # Load user preferences from database
+    preferences = self.load_user_preferences(caller_id)
+    
+    # Store in session state for quick access
+    self.update_state(raw_data.get("call_id"), {
+        "user_preferences": preferences,
+        "language": preferences.get("language", "en-US"),
+        "previous_orders": preferences.get("recent_orders", [])
+    })
+    
+    return SwaigFunctionResult("User preferences loaded")
+```
+
+##### 2. Analytics and Logging
+```python
+@AgentBase.tool(name="hangup_hook")
+def hangup_hook(self, args, raw_data):
+    call_id = raw_data.get("call_id")
+    state = self.get_state(call_id)
+    
+    # Send analytics data
+    analytics_data = {
+        "call_id": call_id,
+        "duration": state.get("duration"),
+        "functions_called": state.get("functions_called", []),
+        "outcome": state.get("outcome", "unknown")
+    }
+    
+    # Post to analytics service
+    self.send_to_analytics(analytics_data)
+    
+    return SwaigFunctionResult("Analytics data sent")
+```
+
+#### Important Notes
+
+1. **Function Names**: The hooks must be named exactly `startup_hook` and `hangup_hook` for SignalWire to call them
+2. **Error Handling**: Always implement proper error handling in hooks - failures shouldn't crash the voice session
+3. **Timing**: `startup_hook` is called before the AI starts speaking to the caller
+4. **Session Data**: Any data you need to persist across the session should be stored in external storage (Redis, database, etc.)
+5. **Return Values**: Both hooks must return a `SwaigFunctionResult` object
 
 ### SIP Routing
 
@@ -2372,8 +2454,7 @@ my-prefab-agents/
 - `port`: Port to bind to (default: 3000)
 - `basic_auth`: Optional (username, password) tuple
 - `use_pom`: Whether to use POM for prompts (default: True)
-- `enable_state_tracking`: Enable conversation state (default: False)
-- `token_expiry_secs`: State token expiry time (default: 3600)
+- `token_expiry_secs`: Security token expiry time (default: 3600)
 - `auto_answer`: Auto-answer calls (default: True)
 - `record_call`: Record calls (default: False)
 - `schema_path`: Optional path to schema.json file

@@ -28,7 +28,6 @@ AgentBase(
     port: int = 3000,
     basic_auth: Optional[Tuple[str, str]] = None,
     use_pom: bool = True,
-    enable_state_tracking: bool = False,
     token_expiry_secs: int = 3600,
     auto_answer: bool = True,
     record_call: bool = False,
@@ -51,7 +50,6 @@ AgentBase(
 - `port` (int): Port number to listen on (default: 3000)
 - `basic_auth` (Optional[Tuple[str, str]]): Username/password for HTTP basic auth
 - `use_pom` (bool): Whether to use Prompt Object Model (default: True)
-- `enable_state_tracking` (bool): Enable persistent state management (default: False)
 - `token_expiry_secs` (int): Security token expiration time (default: 3600)
 - `auto_answer` (bool): Automatically answer incoming calls (default: True)
 - `record_call` (bool): Record calls by default (default: False)
@@ -543,6 +541,49 @@ Register a pre-built SWAIG function dictionary.
 weather_tool = DataMap('get_weather').webhook('GET', 'https://api.weather.com/...')
 agent.register_swaig_function(weather_tool.to_swaig_function())
 ```
+
+### Session Lifecycle Hooks
+
+SignalWire AI agents support special SWAIG functions that are automatically called at specific points in the conversation lifecycle:
+
+##### `startup_hook`
+Called when a new conversation/call begins.
+
+**Implementation:**
+```python
+@AgentBase.tool(
+    name="startup_hook",
+    description="Called when a new conversation starts to initialize state",
+    parameters={}
+)
+def startup_hook(self, args, raw_data):
+    call_id = raw_data.get("call_id")
+    # Initialize session resources, load user data, etc.
+    return SwaigFunctionResult("Session initialized")
+```
+
+##### `hangup_hook`
+Called when a conversation/call ends.
+
+**Implementation:**
+```python
+@AgentBase.tool(
+    name="hangup_hook",
+    description="Called when conversation ends to clean up resources",
+    parameters={}
+)
+def hangup_hook(self, args, raw_data):
+    call_id = raw_data.get("call_id")
+    # Clean up resources, save session data, etc.
+    return SwaigFunctionResult("Session ended")
+```
+
+**Common Use Cases:**
+- Loading user preferences at session start
+- Initializing session-specific resources
+- Logging conversation metrics
+- Cleaning up temporary data
+- Saving conversation summaries
 
 ### Skills System
 
@@ -2854,7 +2895,6 @@ class ComprehensiveAgent(AgentBase):
     def __init__(self):
         super().__init__(
             name="Comprehensive Agent",
-            enable_state_tracking=True,
             auto_answer=True,
             record_call=True
         )

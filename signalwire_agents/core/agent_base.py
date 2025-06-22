@@ -112,7 +112,6 @@ class AgentBase(
         port: int = 3000,
         basic_auth: Optional[Tuple[str, str]] = None,
         use_pom: bool = True,
-        enable_state_tracking: bool = False,
         token_expiry_secs: int = 3600,
         auto_answer: bool = True,
         record_call: bool = False,
@@ -136,7 +135,6 @@ class AgentBase(
             port: Port to bind the web server to
             basic_auth: Optional (username, password) tuple for basic auth
             use_pom: Whether to use POM for prompt building
-            enable_state_tracking: Whether to register startup_hook and hangup_hook SWAIG functions to track conversation state
             token_expiry_secs: Seconds until tokens expire
             auto_answer: Whether to automatically answer calls
             record_call: Whether to record calls
@@ -204,7 +202,6 @@ class AgentBase(
         
         # Initialize session manager
         self._session_manager = SessionManager(token_expiry_secs=token_expiry_secs)
-        self._enable_state_tracking = enable_state_tracking
         
         # URL override variables
         self._web_hook_url_override = None
@@ -233,9 +230,6 @@ class AgentBase(
         # Add native_functions parameter
         self.native_functions = native_functions or []
         
-        # Register state tracking tools if enabled
-        if enable_state_tracking:
-            self._register_state_tracking_tools()
         
         # Initialize new configuration containers
         self._hints = []
@@ -576,7 +570,7 @@ class AgentBase(
         post_prompt = agent_to_use.get_post_prompt()
         
         # Generate a call ID if needed
-        if agent_to_use._enable_state_tracking and call_id is None:
+        if call_id is None:
             call_id = agent_to_use._session_manager.create_session()
             
         # Start with any SWAIG query params that were set

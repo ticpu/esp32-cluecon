@@ -137,7 +137,6 @@ class AgentBase:
         port: int = 3000,
         basic_auth: Optional[Tuple[str, str]] = None,
         use_pom: bool = True,
-        enable_state_tracking: bool = False,
         token_expiry_secs: int = 3600,
         auto_answer: bool = True,
         record_call: bool = False,

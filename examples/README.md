@@ -79,11 +79,11 @@ python simple_agent.py
 
 ### stateful_agent.py
 
-Demonstrates how to use the state management capabilities of the SDK, including:
-- Enabling state tracking with `enable_state_tracking=True`
-- Using the built-in lifecycle hooks (`startup_hook` and `hangup_hook`)
-- Storing and retrieving data in the conversation state
-- Creating custom SWAIG tools that interact with the state
+Demonstrates how to implement session lifecycle tracking:
+- Implementing lifecycle hooks (`startup_hook` and `hangup_hook`)
+- Using external storage (e.g., Redis, database) for persistent data
+- Creating custom SWAIG tools that track session state
+- Managing session resources and cleanup
 
 To run:
 

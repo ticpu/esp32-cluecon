@@ -1056,10 +1056,10 @@ The SDK supports multiple deployment models:
    - Implement proper error handling
    - Return structured responses
 
-3. **State Management**
-   - Store essential conversation context in state
-   - Enable automatic state tracking with `enable_state_tracking=True`
-   - Use secure state storage for sensitive data
+3. **Session Lifecycle**
+   - Implement `startup_hook` and `hangup_hook` SWAIG functions to track session lifecycle
+   - Use these hooks to initialize and clean up session resources
+   - Store any persistent data in your preferred external storage
 
 4. **Security**
    - Use HTTPS in production
@@ -1151,8 +1151,14 @@ Components:
 - **SessionManager**: Handles session creation, activation, and termination
 - **Token Management**: Secure token generation and validation for function calls
 
-When `enable_state_tracking=True` is set, the system automatically registers lifecycle hooks:
+Session lifecycle can be tracked by implementing special SWAIG functions:
 - **startup_hook**: Called when a new call/session starts
 - **hangup_hook**: Called when a call/session ends
 
-Note: For persistent state storage across calls, consider implementing a storage skill for your preferred backend (Redis, PostgreSQL, etc.)
+These hooks are optional but useful for:
+- Initializing session-specific resources
+- Loading user preferences or history
+- Cleaning up temporary data
+- Logging session metrics
+
+Note: For persistent state storage across calls, integrate your preferred backend (Redis, PostgreSQL, etc.) directly in your agent code.

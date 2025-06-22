@@ -62,7 +62,6 @@ class TestAgentBaseInitialization:
             port=8080,
             basic_auth=("user", "pass"),
             use_pom=False,
-            enable_state_tracking=True,
             auto_answer=False,
             record_call=True,
             agent_id="custom-id",

@@ -255,10 +255,10 @@ class SigmondSimple(AgentBase):
             "Stateless agents can be deployed as CGI scripts, Docker containers, and scaled horizontally without coordination.",
             "State management is an optional feature that you can enable when you specifically need persistent data across conversations.",
             "When enabled, access current state using the get_state method and update it with the set_state method.",
-            "State is automatically persisted and restored between requests for seamless conversations when needed.",
-            "Use state only when you need to remember user preferences, conversation history, or application-specific data.",
-            "State data should be JSON-serializable to ensure proper persistence across requests.",
-            "Enable state tracking in the constructor with enable_state_tracking parameter only when required."
+            "Implement startup_hook and hangup_hook SWAIG functions to track session lifecycle.",
+            "Use external storage (Redis, database) when you need to persist data across sessions.",
+            "Session data should be JSON-serializable to ensure proper persistence.",
+            "The startup_hook is called when a conversation begins, hangup_hook when it ends."
         ])
         
         self.prompt_add_section("Dynamic_Configuration", bullets=[
