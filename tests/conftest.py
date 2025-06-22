@@ -24,7 +24,6 @@ from signalwire_agents.core.function_result import SwaigFunctionResult
 from signalwire_agents.core.swaig_function import SWAIGFunction
 from signalwire_agents.core.data_map import DataMap
 from signalwire_agents.core.contexts import ContextBuilder
-from signalwire_agents.core.state import StateManager, FileStateManager
 from signalwire_agents.core.swml_service import SWMLService
 
 

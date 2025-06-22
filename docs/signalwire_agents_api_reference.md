@@ -34,7 +34,6 @@ AgentBase(
     record_call: bool = False,
     record_format: str = "mp4",
     record_stereo: bool = True,
-    state_manager: Optional[StateManager] = None,
     default_webhook_url: Optional[str] = None,
     agent_id: Optional[str] = None,
     native_functions: Optional[List[str]] = None,
@@ -58,7 +57,6 @@ AgentBase(
 - `record_call` (bool): Record calls by default (default: False)
 - `record_format` (str): Recording format: "mp4", "wav", "mp3" (default: "mp4")
 - `record_stereo` (bool): Record in stereo (default: True)
-- `state_manager` (Optional[StateManager]): Custom state manager instance
 - `default_webhook_url` (Optional[str]): Default webhook URL for functions
 - `agent_id` (Optional[str]): Unique identifier for the agent
 - `native_functions` (Optional[List[str]]): List of native function names to enable
@@ -2504,192 +2502,6 @@ manager_context.set_system_prompt("You are a senior manager") \
 
 ---
 
-## State Management
-
-The State Management system provides persistent storage for conversation data across calls and sessions.
-
-### StateManager (Abstract Base Class)
-
-The base interface that all state managers must implement.
-
-#### Core Methods
-
-##### `store(call_id: str, data: Dict[str, Any]) -> bool`
-Store state data for a call.
-
-**Parameters:**
-- `call_id` (str): Unique identifier for the call
-- `data` (Dict[str, Any]): State data to store
-
-**Returns:**
-- bool: True if successful, False otherwise
-
-##### `retrieve(call_id: str) -> Optional[Dict[str, Any]]`
-Retrieve state data for a call.
-
-**Parameters:**
-- `call_id` (str): Unique identifier for the call
-
-**Returns:**
-- Optional[Dict[str, Any]]: State data or None if not found
-
-##### `update(call_id: str, data: Dict[str, Any]) -> bool`
-Update existing state data (merges with existing).
-
-**Parameters:**
-- `call_id` (str): Unique identifier for the call
-- `data` (Dict[str, Any]): Data to merge with existing state
-
-**Returns:**
-- bool: True if successful, False otherwise
-
-##### `delete(call_id: str) -> bool`
-Delete state data for a call.
-
-**Parameters:**
-- `call_id` (str): Unique identifier for the call
-
-**Returns:**
-- bool: True if successful, False otherwise
-
-##### `cleanup_expired() -> int`
-Clean up expired state data.
-
-**Returns:**
-- int: Number of expired items cleaned up
-
-##### `exists(call_id: str) -> bool`
-Check if state exists for a call.
-
-**Parameters:**
-- `call_id` (str): Unique identifier for the call
-
-**Returns:**
-- bool: True if state exists, False otherwise
-
-### FileStateManager
-
-File-based state manager implementation that stores state data in JSON files.
-
-#### Constructor
-
-```python
-FileStateManager(
-    storage_dir: str = "./agent_state",
-    expiry_hours: int = 24,
-    auto_cleanup: bool = True
-)
-```
-
-**Parameters:**
-- `storage_dir` (str): Directory to store state files (default: "./agent_state")
-- `expiry_hours` (int): Hours after which state expires (default: 24)
-- `auto_cleanup` (bool): Automatically clean up expired files (default: True)
-
-#### Usage
-
-```python
-from signalwire_agents.core.state import FileStateManager
-
-# Create file-based state manager
-state_manager = FileStateManager(
-    storage_dir="/var/agent_state",
-    expiry_hours=48,  # 2 days
-    auto_cleanup=True
-)
-
-# Use with agent
-agent = AgentBase(
-    name="Stateful Agent",
-    enable_state_tracking=True,
-    state_manager=state_manager
-)
-
-# Manual state operations
-state_manager.store("call_123", {
-    "customer_id": "12345",
-    "issue_type": "billing",
-    "status": "in_progress"
-})
-
-# Retrieve state
-state = state_manager.retrieve("call_123")
-if state:
-    print(f"Customer: {state['customer_id']}")
-
-# Update state
-state_manager.update("call_123", {
-    "status": "resolved",
-    "resolution": "Account credited"
-})
-
-# Clean up expired state
-cleaned = state_manager.cleanup_expired()
-print(f"Cleaned up {cleaned} expired state files")
-```
-
-### Custom State Manager
-
-You can implement custom state managers for databases, Redis, etc.:
-
-```python
-from signalwire_agents.core.state import StateManager
-import redis
-
-class RedisStateManager(StateManager):
-    def __init__(self, redis_url: str, expiry_seconds: int = 86400):
-        self.redis = redis.from_url(redis_url)
-        self.expiry = expiry_seconds
-    
-    def store(self, call_id: str, data: Dict[str, Any]) -> bool:
-        try:
-            import json
-            self.redis.setex(
-                f"agent_state:{call_id}",
-                self.expiry,
-                json.dumps(data)
-            )
-            return True
-        except Exception:
-            return False
-    
-    def retrieve(self, call_id: str) -> Optional[Dict[str, Any]]:
-        try:
-            import json
-            data = self.redis.get(f"agent_state:{call_id}")
-            return json.loads(data) if data else None
-        except Exception:
-            return None
-    
-    def update(self, call_id: str, data: Dict[str, Any]) -> bool:
-        existing = self.retrieve(call_id)
-        if existing:
-            existing.update(data)
-            return self.store(call_id, existing)
-        return self.store(call_id, data)
-    
-    def delete(self, call_id: str) -> bool:
-        try:
-            self.redis.delete(f"agent_state:{call_id}")
-            return True
-        except Exception:
-            return False
-    
-    def cleanup_expired(self) -> int:
-        # Redis handles expiry automatically
-        return 0
-
-# Use custom state manager
-redis_state = RedisStateManager("redis://localhost:6379")
-agent = AgentBase(
-    name="Redis Agent",
-    enable_state_tracking=True,
-    state_manager=redis_state
-)
-```
-
----
-
 ## Skills System
 
 The Skills System provides modular, reusable capabilities that can be easily added to any agent.
@@ -3037,20 +2849,12 @@ Here's a comprehensive example using multiple SDK components:
 
 ```python
 from signalwire_agents import AgentBase, SwaigFunctionResult, DataMap
-from signalwire_agents.core.state import FileStateManager
 
 class ComprehensiveAgent(AgentBase):
     def __init__(self):
-        # Initialize with state management
-        state_manager = FileStateManager(
-            storage_dir="./agent_state",
-            expiry_hours=48
-        )
-        
         super().__init__(
             name="Comprehensive Agent",
             enable_state_tracking=True,
-            state_manager=state_manager,
             auto_answer=True,
             record_call=True
         )

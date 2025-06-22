@@ -519,64 +519,6 @@ if __name__ == "__main__":
     agent.serve(host="0.0.0.0", port=8000)
 ```
 
-## Using State Management
-
-```python
-from signalwire_agents import AgentBase
-from signalwire_agents.core.function_result import SwaigFunctionResult
-from signalwire_agents.core.state import FileStateManager
-
-class StatefulAgent(AgentBase):
-    def __init__(self):
-        # Configure state management
-        state_manager = FileStateManager(storage_dir="./state_data")
-        
-        super().__init__(
-            name="stateful", 
-            route="/stateful",
-            enable_state_tracking=True,  # Enable state tracking
-            state_manager=state_manager  # Use custom state manager
-        )
-        
-        # When enable_state_tracking=True, startup_hook and hangup_hook
-        # are automatically registered to track session lifecycle
-    
-    # Custom tool for accessing and updating state
-    @AgentBase.tool(
-        name="save_preference",
-        description="Save a user preference",
-        parameters={
-            "preference_name": {
-                "type": "string",
-                "description": "Name of the preference to save"
-            },
-            "preference_value": {
-                "type": "string",
-                "description": "Value of the preference"
-            }
-        }
-    )
-    def save_preference(self, args, raw_data):
-        # Get the call ID from the raw data
-        call_id = raw_data.get("call_id")
-        
-        if call_id:
-            # Get current state or empty dict if none exists
-            state = self.get_state(call_id) or {}
-            
-            # Update the state
-            preferences = state.get("preferences", {})
-            preferences[args.get("preference_name")] = args.get("preference_value")
-            state["preferences"] = preferences
-            
-            # Save the updated state
-            self.update_state(call_id, state)
-            
-            return SwaigFunctionResult("Preference saved successfully")
-        else:
-            return SwaigFunctionResult("Could not save preference: No call ID")
-```
-
 ## Using Prefab Agents
 
 ```python

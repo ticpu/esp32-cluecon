@@ -20,7 +20,6 @@ class TestAgentBaseInitialization:
         """Helper to create a properly mocked agent"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager') as mock_session_manager, \
-             patch('signalwire_agents.core.agent_base.FileStateManager') as mock_state_manager, \
              patch('signalwire_agents.core.agent_base.SkillManager') as mock_skill_manager, \
              patch('signalwire_agents.core.agent_base.SchemaUtils') as mock_schema_utils:
             
@@ -31,7 +30,6 @@ class TestAgentBaseInitialization:
             mock_swml_service.return_value = mock_swml_instance
             
             mock_session_manager.return_value = Mock()
-            mock_state_manager.return_value = Mock()
             mock_skill_manager.return_value = Mock()
             mock_schema_utils.return_value = Mock(schema_path=None, schema=None)
             
@@ -93,7 +91,6 @@ class TestAgentBasePromptMethods:
         """Set up test fixtures"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'):
             
@@ -157,7 +154,6 @@ class TestAgentBaseConfigurationMethods:
         """Set up test fixtures"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'):
             
@@ -269,7 +265,6 @@ class TestAgentBaseToolMethods:
         """Set up test fixtures"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'), \
              patch('signalwire_agents.core.agent_base.SWAIGFunction') as mock_swaig_function:
@@ -360,7 +355,6 @@ class TestAgentBaseAuthMethods:
         """Set up test fixtures"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'):
             
@@ -390,7 +384,6 @@ class TestAgentBaseAuthMethods:
         """Test basic auth validation when no auth is configured"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'):
             
@@ -432,7 +425,6 @@ class TestAgentBaseURLMethods:
         """Set up test fixtures"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'):
             
@@ -456,7 +448,6 @@ class TestAgentBaseURLMethods:
         """Test getting full URL with auth"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'):
             
@@ -504,7 +495,6 @@ class TestAgentBaseSkillMethods:
         """Set up test fixtures"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager') as mock_skill_manager, \
              patch('signalwire_agents.core.agent_base.SchemaUtils'):
             
@@ -563,7 +553,6 @@ class TestAgentBaseTokenMethods:
         """Set up test fixtures"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager') as mock_session_manager, \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'):
             
@@ -611,7 +600,6 @@ class TestAgentBaseMiscMethods:
         """Set up test fixtures"""
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'):
             
@@ -676,7 +664,6 @@ class TestAgentBaseDeclarativePrompts:
         
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'), \
              patch.object(TestAgent, 'prompt_add_section') as mock_add_section:
@@ -701,7 +688,6 @@ class TestAgentBaseDeclarativePrompts:
         
         with patch('signalwire_agents.core.agent_base.SWMLService') as mock_swml_service, \
              patch('signalwire_agents.core.agent_base.SessionManager'), \
-             patch('signalwire_agents.core.agent_base.FileStateManager'), \
              patch('signalwire_agents.core.agent_base.SkillManager'), \
              patch('signalwire_agents.core.agent_base.SchemaUtils'), \
              patch.object(TestAgent, 'prompt_add_section') as mock_add_section:

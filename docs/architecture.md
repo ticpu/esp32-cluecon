@@ -365,12 +365,7 @@ The SDK is designed to be highly extensible:
    agent.add_hints(["SignalWire", "SWML", "SWAIG"])
    ```
 
-4. **State Management**: Implement custom state persistence
-   ```python
-   class CustomStateManager(StateManager):
-       def get_state(self, call_id):
-           # Implementation
-   ```
+4. **Session Management**: The SDK includes session management for secure function calls
 
 5. **Request Handling**: Override request handling methods
    ```python
@@ -1141,28 +1136,23 @@ Key environment variables:
 3. Summary is extracted from request
 4. `on_summary()` is called to process the data
 
-## State Management
+## Session Management
 
-The SDK provides a flexible state management system:
+The SDK provides session management for secure function call authentication:
 
 ```
 ┌───────────────┐     ┌─────────────────┐     ┌───────────────┐
-│ Session       │     │ State           │     │ Persistence   │
-│ Management    │━━━━▶│ Manager         │━━━━▶│ Layer         │
+│ Session       │     │ Token           │     │ Validation    │
+│ Manager       │━━━━▶│ Generation      │━━━━▶│ Layer         │
 └───────────────┘     └─────────────────┘     └───────────────┘
 ```
 
 Components:
 - **SessionManager**: Handles session creation, activation, and termination
-- **StateManager**: Interface for state operations
-- **Implementation Options**: FileStateManager, MemoryStateManager, etc.
+- **Token Management**: Secure token generation and validation for function calls
 
-State is indexed by call ID and can store arbitrary JSON data. When `enable_state_tracking=True` is set, the system automatically registers lifecycle hooks:
+When `enable_state_tracking=True` is set, the system automatically registers lifecycle hooks:
 - **startup_hook**: Called when a new call/session starts
 - **hangup_hook**: Called when a call/session ends
 
-Common state management methods:
-- `get_state(call_id)`: Retrieve state for a call
-- `update_state(call_id, data)`: Update state for a call
-- `set_state(call_id, data)`: Set state for a call (overriding existing)
-- `clear_state(call_id)`: Remove state for a call
+Note: For persistent state storage across calls, consider implementing a storage skill for your preferred backend (Redis, PostgreSQL, etc.)

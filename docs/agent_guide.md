@@ -1732,8 +1732,7 @@ Enable state tracking to persist information across interactions:
 # Enable state tracking in the constructor
 super().__init__(
     name="stateful-agent",
-    enable_state_tracking=True,  # Automatically registers startup_hook and hangup_hook
-    state_manager=FileStateManager(storage_dir="./state")  # Optional custom state manager
+    enable_state_tracking=True  # Automatically registers startup_hook and hangup_hook
 )
 
 # Access and update state
@@ -2377,7 +2376,6 @@ my-prefab-agents/
 - `token_expiry_secs`: State token expiry time (default: 3600)
 - `auto_answer`: Auto-answer calls (default: True)
 - `record_call`: Record calls (default: False)
-- `state_manager`: Custom state manager (default: None)
 - `schema_path`: Optional path to schema.json file
 - `suppress_logs`: Whether to suppress structured logs (default: False)
 

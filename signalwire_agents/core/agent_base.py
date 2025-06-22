@@ -49,7 +49,6 @@ from signalwire_agents.core.swaig_function import SWAIGFunction
 from signalwire_agents.core.function_result import SwaigFunctionResult
 from signalwire_agents.core.swml_renderer import SwmlRenderer
 from signalwire_agents.core.security.session_manager import SessionManager
-from signalwire_agents.core.state import StateManager, FileStateManager
 from signalwire_agents.core.swml_service import SWMLService
 from signalwire_agents.core.swml_handler import AIVerbHandler
 from signalwire_agents.core.skill_manager import SkillManager
@@ -119,7 +118,6 @@ class AgentBase(
         record_call: bool = False,
         record_format: str = "mp4",
         record_stereo: bool = True,
-        state_manager: Optional[StateManager] = None,
         default_webhook_url: Optional[str] = None,
         agent_id: Optional[str] = None,
         native_functions: Optional[List[str]] = None,
@@ -144,7 +142,6 @@ class AgentBase(
             record_call: Whether to record calls
             record_format: Recording format
             record_stereo: Whether to record in stereo
-            state_manager: Optional state manager for this agent
             default_webhook_url: Optional default webhook URL for all SWAIG functions
             agent_id: Optional unique ID for this agent, generated if not provided
             native_functions: Optional list of native functions to include in the SWAIG object
@@ -229,8 +226,6 @@ class AgentBase(
         # Process declarative PROMPT_SECTIONS if defined in subclass
         self._process_prompt_sections()
         
-        # Initialize state manager
-        self._state_manager = state_manager or FileStateManager()
         
         # Process class-decorated tools (using @AgentBase.tool)
         self._tool_registry.register_class_decorated_tools()

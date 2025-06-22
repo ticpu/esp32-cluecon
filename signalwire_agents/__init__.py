@@ -24,7 +24,6 @@ __version__ = "0.1.27"
 from .core.agent_base import AgentBase
 from .core.contexts import ContextBuilder, Context, Step, create_simple_context
 from .core.data_map import DataMap, create_simple_api_tool, create_expression_tool
-from .core.state import StateManager, FileStateManager
 from signalwire_agents.agent_server import AgentServer
 from signalwire_agents.core.swml_service import SWMLService
 from signalwire_agents.core.swml_builder import SWMLBuilder
@@ -68,8 +67,6 @@ __all__ = [
     "AgentServer", 
     "SWMLService",
     "SWMLBuilder",
-    "StateManager",
-    "FileStateManager",
     "SwaigFunctionResult",
     "SWAIGFunction",
     "DataMap",
