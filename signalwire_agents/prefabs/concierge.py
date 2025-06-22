@@ -52,7 +52,6 @@ class ConciergeAgent(AgentBase):
         welcome_message: Optional[str] = None,
         name: str = "concierge",
         route: str = "/concierge",
-        enable_state_tracking: bool = True,
         **kwargs
     ):
         """
@@ -67,7 +66,6 @@ class ConciergeAgent(AgentBase):
             welcome_message: Optional custom welcome message
             name: Agent name for the route
             route: HTTP route for this agent
-            enable_state_tracking: Whether to enable state tracking (default: True)
             **kwargs: Additional arguments for AgentBase
         """
         # Initialize the base agent
@@ -75,7 +73,6 @@ class ConciergeAgent(AgentBase):
             name=name,
             route=route,
             use_pom=True,
-            enable_state_tracking=enable_state_tracking,
             **kwargs
         )
         
