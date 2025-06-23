@@ -8,15 +8,23 @@ See LICENSE file in the project root for full license information.
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI, HTTPException, Request, Response, Depends
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.security import HTTPBasic, HTTPBasicCredentials
     from pydantic import BaseModel
 except ImportError:
     FastAPI = None
     HTTPException = None
     BaseModel = None
+    Request = None
+    Response = None
+    Depends = None
+    CORSMiddleware = None
+    HTTPBasic = None
+    HTTPBasicCredentials = None
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -25,8 +33,11 @@ except ImportError:
 
 from .query_processor import preprocess_query
 from .search_engine import SearchEngine
+from signalwire_agents.core.security_config import SecurityConfig
+from signalwire_agents.core.config_loader import ConfigLoader
+from signalwire_agents.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("search_service")
 
 # Pydantic models for API
 if BaseModel:
@@ -73,14 +84,30 @@ else:
 class SearchService:
     """Local search service with HTTP API"""
     
-    def __init__(self, port: int = 8001, indexes: Dict[str, str] = None):
+    def __init__(self, port: int = 8001, indexes: Dict[str, str] = None, 
+                 basic_auth: Optional[Tuple[str, str]] = None,
+                 config_file: Optional[str] = None):
+        # Load configuration first
+        self._load_config(config_file)
+        
+        # Override with constructor params if provided
         self.port = port
-        self.indexes = indexes or {}
+        if indexes is not None:
+            self.indexes = indexes
+        
         self.search_engines = {}
         self.model = None
         
+        # Load security configuration with optional config file
+        self.security = SecurityConfig(config_file=config_file, service_name="search")
+        self.security.log_config("SearchService")
+        
+        # Set up authentication
+        self._basic_auth = basic_auth or self.security.get_basic_auth()
+        
         if FastAPI:
             self.app = FastAPI(title="SignalWire Local Search Service")
+            self._setup_security()
             self._setup_routes()
         else:
             self.app = None
@@ -88,22 +115,131 @@ class SearchService:
         
         self._load_resources()
     
+    def _load_config(self, config_file: Optional[str]):
+        """Load configuration from file if available"""
+        # Initialize defaults
+        self.indexes = {}
+        
+        # Find config file
+        if not config_file:
+            config_file = ConfigLoader.find_config_file("search")
+        
+        if not config_file:
+            return
+            
+        # Load config
+        config_loader = ConfigLoader([config_file])
+        if not config_loader.has_config():
+            return
+            
+        logger.info("loading_config_from_file", file=config_file)
+        
+        # Get service section
+        service_config = config_loader.get_section('service')
+        if service_config:
+            if 'port' in service_config:
+                self.port = int(service_config['port'])
+            
+            if 'indexes' in service_config and isinstance(service_config['indexes'], dict):
+                self.indexes = service_config['indexes']
+    
+    def _setup_security(self):
+        """Setup security middleware and authentication"""
+        if not self.app:
+            return
+            
+        # Add CORS middleware if FastAPI has it
+        if CORSMiddleware:
+            self.app.add_middleware(
+                CORSMiddleware,
+                **self.security.get_cors_config()
+            )
+        
+        # Add security headers middleware
+        @self.app.middleware("http")
+        async def add_security_headers(request: Request, call_next):
+            response = await call_next(request)
+            
+            # Add security headers
+            is_https = request.url.scheme == "https"
+            headers = self.security.get_security_headers(is_https)
+            for header, value in headers.items():
+                response.headers[header] = value
+            
+            return response
+        
+        # Add host validation middleware
+        @self.app.middleware("http")
+        async def validate_host(request: Request, call_next):
+            host = request.headers.get("host", "").split(":")[0]
+            if host and not self.security.should_allow_host(host):
+                return Response(content="Invalid host", status_code=400)
+            
+            return await call_next(request)
+    
+    def _get_current_username(self, credentials: HTTPBasicCredentials = None) -> str:
+        """Validate basic auth credentials"""
+        if not credentials:
+            return None
+            
+        correct_username, correct_password = self._basic_auth
+        
+        # Compare credentials
+        import secrets
+        username_correct = secrets.compare_digest(credentials.username, correct_username)
+        password_correct = secrets.compare_digest(credentials.password, correct_password)
+        
+        if not (username_correct and password_correct):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Basic"},
+            )
+        
+        return credentials.username
+    
     def _setup_routes(self):
         """Setup FastAPI routes"""
         if not self.app:
             return
+        
+        # Create security dependency if HTTPBasic is available
+        security = HTTPBasic() if HTTPBasic else None
+        
+        # Create dependency for authenticated routes
+        def get_authenticated():
+            if security:
+                return security
+            return None
             
         @self.app.post("/search", response_model=SearchResponse)
-        async def search(request: SearchRequest):
+        async def search(
+            request: SearchRequest,
+            credentials: HTTPBasicCredentials = None if not security else Depends(security)
+        ):
+            if security:
+                self._get_current_username(credentials)
             return await self._handle_search(request)
         
         @self.app.get("/health")
         async def health():
-            return {"status": "healthy", "indexes": list(self.indexes.keys())}
+            return {
+                "status": "healthy", 
+                "indexes": list(self.indexes.keys()),
+                "ssl_enabled": self.security.ssl_enabled,
+                "auth_required": bool(security)
+            }
         
         @self.app.post("/reload_index")
-        async def reload_index(index_name: str, index_path: str):
+        async def reload_index(
+            index_name: str, 
+            index_path: str,
+            credentials: HTTPBasicCredentials = None if not security else Depends(security)
+        ):
             """Reload or add new index"""
+            if security:
+                self._get_current_username(credentials)
+                
             self.indexes[index_name] = index_path
             self.search_engines[index_name] = SearchEngine(index_path, self.model)
             return {"status": "reloaded", "index": index_name}
@@ -235,14 +371,67 @@ class SearchService:
             'query_analysis': response.query_analysis
         }
     
-    def start(self):
-        """Start the service"""
+    def start(self, host: str = "0.0.0.0", port: Optional[int] = None,
+              ssl_cert: Optional[str] = None, ssl_key: Optional[str] = None):
+        """
+        Start the service with optional HTTPS support.
+        
+        Args:
+            host: Host to bind to (default: "0.0.0.0")
+            port: Port to bind to (default: self.port)
+            ssl_cert: Path to SSL certificate file (overrides environment)
+            ssl_key: Path to SSL key file (overrides environment)
+        """
         if not self.app:
             raise RuntimeError("FastAPI not available. Cannot start HTTP service.")
         
+        port = port or self.port
+        
+        # Get SSL configuration
+        ssl_kwargs = {}
+        if ssl_cert and ssl_key:
+            # Use provided SSL files
+            ssl_kwargs = {
+                'ssl_certfile': ssl_cert,
+                'ssl_keyfile': ssl_key
+            }
+        else:
+            # Use security config SSL settings
+            ssl_kwargs = self.security.get_ssl_context_kwargs()
+        
+        # Build startup URL
+        scheme = "https" if ssl_kwargs else "http"
+        startup_url = f"{scheme}://{host}:{port}"
+        
+        # Get auth credentials
+        username, password = self._basic_auth
+        
+        # Log startup information
+        logger.info(
+            "starting_search_service",
+            url=startup_url,
+            ssl_enabled=bool(ssl_kwargs),
+            indexes=list(self.indexes.keys()),
+            username=username
+        )
+        
+        # Print user-friendly startup message
+        print(f"\nSignalWire Search Service starting...")
+        print(f"URL: {startup_url}")
+        print(f"Indexes: {', '.join(self.indexes.keys()) if self.indexes else 'None'}")
+        print(f"Basic Auth: {username}:{password}")
+        if ssl_kwargs:
+            print(f"SSL: Enabled")
+        print("")
+        
         try:
             import uvicorn
-            uvicorn.run(self.app, host="0.0.0.0", port=self.port)
+            uvicorn.run(
+                self.app, 
+                host=host, 
+                port=port,
+                **ssl_kwargs
+            )
         except ImportError:
             raise RuntimeError("uvicorn not available. Cannot start HTTP service.")
     

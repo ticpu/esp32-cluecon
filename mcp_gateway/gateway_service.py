@@ -27,11 +27,16 @@ from flask_limiter.util import get_remote_address
 from functools import wraps
 import threading
 
-# Add current directory to path for imports
+# Add parent directory to path for signalwire_agents imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Add current directory to path for local imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from session_manager import SessionManager
 from mcp_manager import MCPManager
+from signalwire_agents.core.config_loader import ConfigLoader
+from signalwire_agents.core.security_config import SecurityConfig
 
 # Configure logging
 logging.basicConfig(
@@ -45,7 +50,22 @@ class MCPGateway:
     """Main gateway service class"""
     
     def __init__(self, config_path: str = "config.json"):
-        self.config = self._load_config(config_path)
+        # Use unified config loader
+        self.config_loader = ConfigLoader([config_path])
+        
+        # Load config with fallback to old method if needed
+        if self.config_loader.has_config():
+            # Use new config loader with variable substitution
+            self.config = self.config_loader.substitute_vars(self.config_loader.get_config())
+            logger.info(f"Loaded config using unified ConfigLoader from {config_path}")
+        else:
+            # Fall back to old method for backward compatibility
+            self.config = self._load_config(config_path)
+            
+        # Load security configuration
+        self.security = SecurityConfig(config_file=config_path, service_name="mcp")
+        self.security.log_config("MCPGateway")
+        
         self.app = Flask(__name__)
         self.mcp_manager = MCPManager(self.config)
         self.session_manager = SessionManager(self.config)
