@@ -42,6 +42,7 @@ except ImportError:
 
 from signalwire_agents.utils.schema_utils import SchemaUtils
 from signalwire_agents.core.swml_handler import VerbHandlerRegistry, SWMLVerbHandler
+from signalwire_agents.core.security_config import SecurityConfig
 
 
 class SWMLService:
@@ -65,7 +66,8 @@ class SWMLService:
         host: str = "0.0.0.0",
         port: int = 3000,
         basic_auth: Optional[Tuple[str, str]] = None,
-        schema_path: Optional[str] = None
+        schema_path: Optional[str] = None,
+        config_file: Optional[str] = None
     ):
         """
         Initialize a new SWML service
@@ -77,21 +79,25 @@ class SWMLService:
             port: Port to bind the web server to
             basic_auth: Optional (username, password) tuple for basic auth
             schema_path: Optional path to the schema file
+            config_file: Optional path to configuration file
         """
         self.name = name
         self.route = route.rstrip("/")  # Ensure no trailing slash
         self.host = host
         self.port = port
         
-        # Initialize SSL configuration from environment variables
-        ssl_enabled_env = os.environ.get('SWML_SSL_ENABLED', '').lower()
-        self.ssl_enabled = ssl_enabled_env in ('true', '1', 'yes')
-        self.domain = os.environ.get('SWML_DOMAIN')
-        self.ssl_cert_path = os.environ.get('SWML_SSL_CERT_PATH')
-        self.ssl_key_path = os.environ.get('SWML_SSL_KEY_PATH')
-        
         # Initialize logger for this instance FIRST before using it
         self.log = logger.bind(service=name)
+        
+        # Load unified security configuration with optional config file
+        self.security = SecurityConfig(config_file=config_file, service_name=name)
+        self.security.log_config("SWMLService")
+        
+        # For backward compatibility, expose SSL settings as instance attributes
+        self.ssl_enabled = self.security.ssl_enabled
+        self.domain = self.security.domain
+        self.ssl_cert_path = self.security.ssl_cert_path
+        self.ssl_key_path = self.security.ssl_key_path
         
         # Initialize proxy detection attributes
         self._proxy_url_base = os.environ.get('SWML_PROXY_URL_BASE')
@@ -108,18 +114,8 @@ class SWMLService:
             # Use provided credentials
             self._basic_auth = basic_auth
         else:
-            # Check environment variables first
-            env_user = os.environ.get('SWML_BASIC_AUTH_USER')
-            env_pass = os.environ.get('SWML_BASIC_AUTH_PASSWORD')
-            
-            if env_user and env_pass:
-                # Use environment variables
-                self._basic_auth = (env_user, env_pass)
-            else:
-                # Generate random credentials as fallback
-                username = f"user_{secrets.token_hex(4)}"
-                password = secrets.token_urlsafe(16)
-                self._basic_auth = (username, password)
+            # Use unified security config for auth credentials
+            self._basic_auth = self.security.get_basic_auth()
         
         # Find the schema file if not provided
         if schema_path is None:
@@ -768,11 +764,9 @@ class SWMLService:
         
         # Validate SSL configuration if enabled
         if self.ssl_enabled:
-            if not ssl_cert_path or not os.path.exists(ssl_cert_path):
-                self.log.warning("ssl_cert_not_found", path=ssl_cert_path)
-                self.ssl_enabled = False
-            elif not ssl_key_path or not os.path.exists(ssl_key_path):
-                self.log.warning("ssl_key_not_found", path=ssl_key_path)
+            is_valid, error = self.security.validate_ssl_config()
+            if not is_valid:
+                self.log.warning("ssl_config_invalid", error=error)
                 self.ssl_enabled = False
             elif not self.domain:
                 self.log.warning("ssl_domain_not_specified")

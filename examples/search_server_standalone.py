@@ -29,6 +29,15 @@ The server will be available at http://localhost:8001 with the following endpoin
 - POST /search - Search the indexes
 - GET /health - Health check and available indexes
 - POST /reload_index - Add or reload an index
+
+Security Features:
+- Basic authentication is automatically enabled (credentials shown at startup)
+- HTTPS can be enabled via environment variables:
+  export SWML_SSL_ENABLED=true
+  export SWML_SSL_CERT_PATH=/path/to/cert.pem
+  export SWML_SSL_KEY_PATH=/path/to/key.pem
+  export SWML_DOMAIN=yourdomain.com
+- Additional security configuration available (see docs/security.md)
 """
 
 import os
