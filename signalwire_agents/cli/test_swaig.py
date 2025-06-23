@@ -727,6 +727,12 @@ def main():
                     # Default behavior - minimal data
                     post_data = generate_minimal_post_data(args.tool_name, function_args)
                 
+                # Apply convenience mappings from CLI args (e.g., --call-id)
+                post_data = apply_convenience_mappings(post_data, args)
+                
+                # Apply explicit overrides
+                post_data = apply_overrides(post_data, args.override, args.override_json)
+                
                 if args.verbose:
                     print(f"Post data: {json.dumps(post_data, indent=2)}")
                     print("-" * 60)

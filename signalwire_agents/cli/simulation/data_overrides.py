@@ -120,8 +120,12 @@ def apply_convenience_mappings(data: Dict[str, Any], args: argparse.Namespace) -
     
     # Map high-level arguments to specific paths
     if hasattr(args, 'call_id') and args.call_id:
-        set_nested_value(data, "call.call_id", args.call_id)
-        set_nested_value(data, "call.tag", args.call_id)  # tag often matches call_id
+        # Set at root level for SWAIG functions
+        data["call_id"] = args.call_id
+        # Also set in call object if it exists
+        if "call" in data:
+            set_nested_value(data, "call.call_id", args.call_id)
+            set_nested_value(data, "call.tag", args.call_id)  # tag often matches call_id
     
     if hasattr(args, 'project_id') and args.project_id:
         set_nested_value(data, "call.project_id", args.project_id)

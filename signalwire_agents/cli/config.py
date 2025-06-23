@@ -41,11 +41,21 @@ ERROR_FUNCTION_NOT_FOUND = "Function '{function_name}' not found in agent"
 ERROR_CGI_HOST_REQUIRED = "CGI simulation requires --cgi-host"
 
 # Help messages
-HELP_DESCRIPTION = "Test SWAIG functions and generate SWML documents for SignalWire AI agents"
+HELP_DESCRIPTION = """Test SWAIG functions and generate SWML documents for SignalWire AI agents
+
+IMPORTANT: When using --exec, ALL options (like --call-id, --verbose, etc.) must come BEFORE --exec.
+Everything after --exec <function_name> is treated as arguments to the function."""
+
 HELP_EPILOG_SHORT = """
 examples:
   # Execute a function
   %(prog)s agent.py --exec search --query "test" --limit 5
+  
+  # Execute with persistent session (--call-id MUST come BEFORE --exec)
+  %(prog)s agent.py --call-id my-session --exec add_todo --text "Buy milk"
+  
+  # WRONG: This won't work! --call-id is treated as a function argument
+  %(prog)s agent.py --exec add_todo --text "Buy milk" --call-id my-session
   
   # Generate SWML
   %(prog)s agent.py --dump-swml --raw | jq '.'
