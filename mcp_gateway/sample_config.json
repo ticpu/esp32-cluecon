@@ -1,0 +1,71 @@
+{
+  "server": {
+    "host": "${MCP_HOST|0.0.0.0}",
+    "port": "${MCP_PORT|8100}",
+    "auth_user": "${MCP_AUTH_USER|admin}",
+    "auth_password": "${MCP_AUTH_PASSWORD|changeme}",
+    "auth_token": "${MCP_AUTH_TOKEN|}"
+  },
+  "services": {
+    "todo": {
+      "command": ["python3", "./test/todo_mcp.py"],
+      "description": "Simple todo list for testing",
+      "enabled": true,
+      "sandbox": {
+        "enabled": true,
+        "resource_limits": true,
+        "restricted_env": true
+      }
+    },
+    "example_shell": {
+      "command": ["python3", "/path/to/shell-mpc/raw_shell_mcp.py"],
+      "description": "Shell PTY access (configure path before enabling)",
+      "enabled": false,
+      "sandbox": {
+        "enabled": false,
+        "note": "Shell access needs full filesystem"
+      }
+    },
+    "example_calculator": {
+      "command": ["node", "/path/to/calculator.js"],
+      "description": "Math calculations (configure path before enabling)",
+      "enabled": false,
+      "sandbox": {
+        "enabled": true,
+        "resource_limits": true,
+        "restricted_env": false,
+        "note": "Calculator needs NODE_PATH but can have resource limits"
+      }
+    },
+    "example_filesystem": {
+      "command": ["python3", "/path/to/filesystem_mcp.py"],
+      "description": "Filesystem operations MCP",
+      "enabled": false,
+      "sandbox": {
+        "enabled": true,
+        "resource_limits": true,
+        "restricted_env": false,
+        "allowed_paths": ["/home/user/documents", "/tmp"],
+        "working_dir": "/home/user",
+        "note": "Filesystem MCP with limited path access"
+      }
+    }
+  },
+  "session": {
+    "default_timeout": "${MCP_SESSION_TIMEOUT|300}",
+    "max_sessions_per_service": "${MCP_MAX_SESSIONS|100}",
+    "cleanup_interval": "${MCP_CLEANUP_INTERVAL|60}",
+    "sandbox_dir": "./sandbox"
+  },
+  "rate_limiting": {
+    "default_limits": ["200 per day", "50 per hour"],
+    "tools_limit": "30 per minute",
+    "call_limit": "10 per minute",
+    "session_delete_limit": "20 per minute",
+    "storage_uri": "memory://"
+  },
+  "logging": {
+    "level": "${MCP_LOG_LEVEL|INFO}",
+    "file": "${MCP_LOG_FILE|gateway.log}"
+  }
+}

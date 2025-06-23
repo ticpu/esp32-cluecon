@@ -1,0 +1,45 @@
+services:
+  mcp-gateway:
+    build: .
+    container_name: mcp-gateway
+    ports:
+      - "${MCP_PORT:-8100}:${MCP_PORT:-8100}"
+    volumes:
+      # Mount the current directory to access config.json
+      - .:/app/host:ro
+      # Mount certs and logs directories
+      - ./certs:/app/certs
+      - ./logs:/app/logs
+      # Create a named volume for the sandbox
+      - mcp-sandbox:/app/sandbox
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MCP_HOST=${MCP_HOST}
+      - MCP_PORT=${MCP_PORT}
+      - MCP_AUTH_USER=${MCP_AUTH_USER}
+      - MCP_AUTH_PASSWORD=${MCP_AUTH_PASSWORD}
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MCP_PORT:-8100}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Priority: 1) Host mount, 2) Baked-in config, 3) Sample config
+    entrypoint: >
+      sh -c "
+        if [ -f /app/host/config.json ]; then
+          cp /app/host/config.json /app/config.json
+          echo 'Using config.json from host mount'
+        elif [ ! -f /app/config.json ]; then
+          cp /app/sample_config.json /app/config.json
+          echo 'No config.json found, using sample_config.json'
+        else
+          echo 'Using pre-configured config.json from image'
+        fi
+        exec python3 gateway_service.py
+      "
+
+volumes:
+  mcp-sandbox:
