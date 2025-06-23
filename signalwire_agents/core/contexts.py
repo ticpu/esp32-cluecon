@@ -259,6 +259,10 @@ class Context:
         # Context prompt (separate from system_prompt)
         self._prompt_text: Optional[str] = None
         self._prompt_sections: List[Dict[str, Any]] = []
+        
+        # Context fillers
+        self._enter_fillers: Optional[Dict[str, List[str]]] = None
+        self._exit_fillers: Optional[Dict[str, List[str]]] = None
     
     def add_step(self, name: str) -> Step:
         """
@@ -450,6 +454,70 @@ class Context:
         self._prompt_sections.append({"title": title, "bullets": bullets})
         return self
     
+    def set_enter_fillers(self, enter_fillers: Dict[str, List[str]]) -> 'Context':
+        """
+        Set fillers that the AI says when entering this context
+        
+        Args:
+            enter_fillers: Dictionary mapping language codes (or "default") to lists of filler phrases
+                          Example: {"en-US": ["Welcome...", "Hello..."], "default": ["Entering..."]}
+            
+        Returns:
+            Self for method chaining
+        """
+        if enter_fillers and isinstance(enter_fillers, dict):
+            self._enter_fillers = enter_fillers
+        return self
+    
+    def set_exit_fillers(self, exit_fillers: Dict[str, List[str]]) -> 'Context':
+        """
+        Set fillers that the AI says when exiting this context
+        
+        Args:
+            exit_fillers: Dictionary mapping language codes (or "default") to lists of filler phrases
+                         Example: {"en-US": ["Goodbye...", "Thank you..."], "default": ["Exiting..."]}
+            
+        Returns:
+            Self for method chaining
+        """
+        if exit_fillers and isinstance(exit_fillers, dict):
+            self._exit_fillers = exit_fillers
+        return self
+    
+    def add_enter_filler(self, language_code: str, fillers: List[str]) -> 'Context':
+        """
+        Add enter fillers for a specific language
+        
+        Args:
+            language_code: Language code (e.g., "en-US", "es") or "default" for catch-all
+            fillers: List of filler phrases for entering this context
+            
+        Returns:
+            Self for method chaining
+        """
+        if language_code and fillers and isinstance(fillers, list):
+            if self._enter_fillers is None:
+                self._enter_fillers = {}
+            self._enter_fillers[language_code] = fillers
+        return self
+    
+    def add_exit_filler(self, language_code: str, fillers: List[str]) -> 'Context':
+        """
+        Add exit fillers for a specific language
+        
+        Args:
+            language_code: Language code (e.g., "en-US", "es") or "default" for catch-all
+            fillers: List of filler phrases for exiting this context
+            
+        Returns:
+            Self for method chaining
+        """
+        if language_code and fillers and isinstance(fillers, list):
+            if self._exit_fillers is None:
+                self._exit_fillers = {}
+            self._exit_fillers[language_code] = fillers
+        return self
+    
     def _render_prompt(self) -> Optional[str]:
         """Render the context's prompt text"""
         if self._prompt_text is not None:
@@ -533,6 +601,13 @@ class Context:
         elif self._prompt_text is not None:
             # Use string format
             context_dict["prompt"] = self._prompt_text
+        
+        # Add enter and exit fillers if defined
+        if self._enter_fillers is not None:
+            context_dict["enter_fillers"] = self._enter_fillers
+        
+        if self._exit_fillers is not None:
+            context_dict["exit_fillers"] = self._exit_fillers
             
         return context_dict
 

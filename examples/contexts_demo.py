@@ -115,7 +115,17 @@ class AdvancedContextsDemoAgent(AgentBase):
         
         # Context 3: Manager Escalation (full context reset)
         manager_context = contexts.add_context("manager") \
-            .set_isolated(True)
+            .set_isolated(True) \
+            .add_enter_filler("en-US", [
+                "Let me connect you with our store manager right away...",
+                "I'll get the manager for you immediately...",
+                "One moment while I bring in the store manager to assist you...",
+                "The manager will be right with you to help resolve this..."
+            ]) \
+            .add_enter_filler("default", [
+                "Transferring to the manager...",
+                "Getting the manager for you..."
+            ])
         
         # Configure context entry
         
@@ -194,6 +204,7 @@ def main():
     print("  • Context entry parameters (system_prompt, consolidate, full_reset, user_prompt)")
     print("  • Context prompts (structured POM format)")
     print("  • Post prompt overrides per context")
+    print("  • Enter fillers for smooth context transitions (manager context demo)")
     print()
     print("Step Features:")
     print("  • Step-to-step navigation (set_valid_steps)")
