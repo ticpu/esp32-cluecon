@@ -1,23 +1,71 @@
-# SignalWire AI Agent SDK
+<!-- Header -->
+<div align="center">
+    <img src="https://github.com/user-attachments/assets/0c8ed3b9-8c50-4dc6-9cc4-cc6cd137fd50" width="500" href="https://signalwire.com" />
 
-A Python SDK for creating, hosting, and securing SignalWire AI agents as microservices with minimal boilerplate.
+# Agents SDK
+
+#### _A Python SDK for creating, hosting, and securing SignalWire AI agents as microservices with minimal boilerplate._
+
+<br/>
+
+<p align="center">
+  <a href="https://developer.signalwire.com/sdks/agents-sdk" target="_blank">📖 Documentation</a> &nbsp; &nbsp; <code>#</code> &nbsp; &nbsp;
+  <a href="https://github.com/signalwire/signalwire-docs/issues/new/choose" target="_blank">🐛 Report an issue</a> &nbsp; &nbsp; <code>#</code> &nbsp; &nbsp;
+  <a href="https://pypi.org/project/signalwire-agents/" target="_blank">🐍 PyPI</a>
+</p>
+
+<br/>
+
+<!-- Badges -->
+<div align="center">
+    <img src="https://img.shields.io/badge/Discord%20Community-5865F2" alt="Discord" href="https://discord.com/invite/F2WNYTNjuF"/>
+    <img src="https://img.shields.io/badge/MIT-License-blue" alt="MIT License" href="LICENSE" />
+    <img src="https://img.shields.io/badge/GitHub-%23121011.svg?logo=github&logoColor=white&" alt="GitHub" href="https://github.com/signalwire"/>
+    <img src="https://img.shields.io/github/stars/signalwire/signalwire-agents" alt="GitHub Stars" href="https://github.com/signalwire/docs"/>
+</div>
+
+</div>
 
 ## Features
 
-- **Self-Contained Agents**: Each agent is both a web app and an AI persona
-- **Prompt Object Model**: Structured prompt composition using POM
-- **SWAIG Integration**: Easily define and handle AI tools/functions
-- **Dynamic Configuration**: Configure agents per-request for multi-tenant apps and personalization
-- **Custom Routing**: Dynamic request handling for different paths and content
-- **SIP Integration**: Route SIP calls to agents based on SIP usernames
-- **Security Built-In**: Session management, function-specific security tokens, and basic auth
-- **State Management**: Persistent conversation state with automatic tracking
-- **Prefab Archetypes**: Ready-to-use agent types for common scenarios
-- **Multi-Agent Support**: Host multiple agents on a single server
-- **Modular Skills System**: Add capabilities to agents with simple one-liner calls
-- **Local Search System**: Offline document search with vector similarity and keyword search
+|                   |                                                                  |
+|-------------------------------|-----------------------------------------------------------------------------|
+| 🤖     **Self-Contained Agents** | Each agent is both a web app and an AI persona                            |
+| 📝     **Prompt Object Model**   | Structured prompt composition using POM                                   |
+| ⚙️     **SWAIG Integration**     | Easily define and handle AI tools/functions                               |
+| 🔧     **Dynamic Configuration** | Configure agents per-request for multi-tenant apps and personalization    |
+| 🗺️     **Custom Routing**        | Dynamic request handling for different paths and content                  |
+| 📞     **SIP Integration**       | Route SIP calls to agents based on SIP usernames                          |
+| 🔒     **Security Built-In**     | Session management, function-specific security tokens, and basic auth     |
+| 💾     **State Management**      | Persistent conversation state with automatic tracking                     |
+| 🏗️     **Prefab Archetypes**     | Ready-to-use agent types for common scenarios                            |
+| 🏢     **Multi-Agent Support**   | Host multiple agents on a single server                                  |
+| �      **Modular Skills System** | Add capabilities to agents with simple one-liner calls                   |
+| 🔍     **Local Search System**   | Offline document search with vector similarity and keyword search        |
 
-## Skills System
+<picture>
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="
+      https://api.star-history.com/svg?repos=signalwire/signalwire-agents&type=Date&theme=dark
+    "
+  />
+  <source
+    media="(prefers-color-scheme: light)"
+    srcset="
+      https://api.star-history.com/svg?repos=signalwire/signalwire-agents&type=Date
+    "
+  />
+  <img
+    alt="Star History Chart"
+    src="https://api.star-history.com/svg?repos=signalwire/signalwire-agents&type=Date"
+  />
+</picture>
+
+<details>
+<summary><h2>Documentation</h2></summary>
+
+### Skills System
 
 The SignalWire Agents SDK includes a powerful modular skills system that allows you to add complex capabilities to your agents with simple one-liner calls:
 
@@ -89,7 +137,7 @@ agent.add_skill("datasphere", {
 agent.serve()
 ```
 
-### Available Built-in Skills
+#### Available Built-in Skills
 
 - **web_search**: Google Custom Search API integration with web scraping (supports multiple instances)
 - **datetime**: Current date and time with timezone support
@@ -97,7 +145,7 @@ agent.serve()
 - **datasphere**: SignalWire DataSphere knowledge search (supports multiple instances)
 - **native_vector_search**: Offline document search with vector similarity and keyword search
 
-### Benefits
+#### Benefits
 
 - **One-liner integration**: `agent.add_skill("skill_name")`
 - **Configurable parameters**: `agent.add_skill("skill_name", {"param": "value"})`
@@ -107,11 +155,11 @@ agent.serve()
 
 For detailed documentation, see [Skills System README](docs/skills_system.md).
 
-## DataMap Tools
+### DataMap Tools
 
 The SDK provides a DataMap system for creating SWAIG tools that integrate directly with REST APIs without requiring custom webhook endpoints. DataMap tools execute on the SignalWire server, making them simpler to deploy than traditional webhook-based tools.
 
-### Basic DataMap Usage
+#### Basic DataMap Usage
 
 ```python
 from signalwire_agents import AgentBase
@@ -137,7 +185,7 @@ agent = APIAgent()
 agent.serve()
 ```
 
-### Advanced DataMap Examples
+#### Advanced DataMap Examples
 
 ```python
 # POST API with authentication
@@ -168,7 +216,7 @@ docs_tool = (DataMap('get_latest_docs')
 )
 ```
 
-### Helper Functions
+#### Helper Functions
 
 For simpler use cases, use the convenience functions:
 
@@ -198,7 +246,7 @@ self.register_swaig_function(weather.to_swaig_function())
 self.register_swaig_function(file_control.to_swaig_function())
 ```
 
-### Variable Expansion
+#### Variable Expansion
 
 DataMap tools support powerful variable expansion using `${variable}` syntax:
 
@@ -208,7 +256,7 @@ DataMap tools support powerful variable expansion using `${variable}` syntax:
 - **Global data**: `${global_data.key}`
 - **Metadata**: `${meta_data.call_id}`
 
-### Benefits of DataMap Tools
+#### Benefits of DataMap Tools
 
 - **No webhook infrastructure**: Tools run on SignalWire servers
 - **Simplified deployment**: No need to expose endpoints
@@ -219,11 +267,11 @@ DataMap tools support powerful variable expansion using `${variable}` syntax:
 
 For detailed documentation, see [DataMap Guide](docs/datamap_guide.md).
 
-## Contexts and Steps
+### Contexts and Steps
 
 The SignalWire Agents SDK provides a powerful enhancement to traditional prompts through the **Contexts and Steps** system. This feature allows you to add structured, workflow-driven AI interactions on top of your base prompt, with explicit navigation control and step-by-step guidance.
 
-### Why Use Contexts and Steps?
+#### Why Use Contexts and Steps?
 
 - **Structured Workflows**: Define clear, step-by-step processes for complex interactions
 - **Navigation Control**: Explicitly control which steps or contexts users can access
@@ -232,7 +280,7 @@ The SignalWire Agents SDK provides a powerful enhancement to traditional prompts
 - **Workflow Isolation**: Create separate contexts for different conversation flows
 - **Enhanced Base Prompts**: Adds structured workflows on top of your existing prompt foundation
 
-### Basic Usage
+#### Basic Usage
 
 ```python
 from signalwire_agents import AgentBase
@@ -277,7 +325,7 @@ agent = WorkflowAgent()
 agent.serve()
 ```
 
-### Advanced Features
+#### Advanced Features
 
 ```python
 class MultiContextAgent(AgentBase):
@@ -320,13 +368,13 @@ class MultiContextAgent(AgentBase):
             .set_valid_contexts(["main"])  # Can return to main
 ```
 
-### Context and Step Methods
+#### Context and Step Methods
 
-#### Context Methods
+##### Context Methods
 - `add_step(name)`: Create a new step in this context
 - `set_valid_contexts(contexts)`: Control which contexts can be accessed from this context
 
-#### Step Methods
+##### Step Methods
 - `set_text(text)`: Set direct text prompt for the step
 - `add_section(title, body)`: Add POM-style section (alternative to set_text)
 - `add_bullets(bullets)`: Add bullet points to the current or last section
@@ -335,14 +383,14 @@ class MultiContextAgent(AgentBase):
 - `set_valid_steps(steps)`: Control navigation to other steps in same context
 - `set_valid_contexts(contexts)`: Control navigation to other contexts
 
-### Navigation Rules
+#### Navigation Rules
 
 - **Valid Steps**: If omitted, only "next" step is implied. If specified, only those steps are allowed.
 - **Valid Contexts**: If omitted, user is trapped in current context. If specified, can navigate to those contexts.
 - **Single Context**: Must be named "default" for single-context workflows.
 - **Function Restrictions**: Use `set_functions(["function_name"])` or `set_functions("none")` to control AI tool access.
 
-### Complete Example: Customer Support Workflow
+#### Complete Example: Customer Support Workflow
 
 ```python
 class SupportAgent(AgentBase):
@@ -397,7 +445,7 @@ agent = SupportAgent()
 agent.serve()
 ```
 
-### Benefits
+#### Benefits
 
 - **Clear Structure**: Explicit workflow definition makes agent behavior predictable
 - **Enhanced Control**: Fine-grained control over function access and navigation
@@ -407,19 +455,19 @@ agent.serve()
 
 For detailed documentation and advanced examples, see [Contexts and Steps Guide](docs/contexts_guide.md).
 
-## Installation
+### Installation
 
-### Basic Installation
+#### Basic Installation
 
 ```bash
 pip install signalwire-agents
 ```
 
-### Optional Search Functionality
+#### Optional Search Functionality
 
 The SDK includes optional local search capabilities that can be installed separately to avoid adding large dependencies to the base installation:
 
-#### Search Installation Options
+##### Search Installation Options
 
 ```bash
 # Query existing .swsearch files only (smallest footprint)
@@ -438,7 +486,7 @@ pip install signalwire-agents[search-nlp]
 pip install signalwire-agents[search-all]
 ```
 
-#### What Each Option Includes
+##### What Each Option Includes
 
 | Option | Size | Features |
 |--------|------|----------|
@@ -454,7 +502,7 @@ pip install signalwire-agents[search-all]
 - Agents that only need to query knowledge bases (not build them)
 - Smaller deployment footprint requirements
 
-#### Search Features
+##### Search Features
 
 - **Local/Offline Search**: No external API dependencies
 - **Hybrid Search**: Vector similarity + keyword search
@@ -463,7 +511,7 @@ pip install signalwire-agents[search-all]
 - **CLI Tools**: Build search indexes from document directories
 - **HTTP API**: Standalone or embedded search service
 
-#### Usage Example
+##### Usage Example
 
 ```python
 # Only available with search extras installed
@@ -486,7 +534,7 @@ results = engine.search(
 )
 ```
 
-## Quick Start
+### Quick Start
 
 ```python
 from signalwire_agents import AgentBase
@@ -519,7 +567,7 @@ if __name__ == "__main__":
     agent.serve(host="0.0.0.0", port=8000)
 ```
 
-## Using Prefab Agents
+### Using Prefab Agents
 
 ```python
 from signalwire_agents.prefabs import InfoGathererAgent
@@ -544,16 +592,16 @@ Available prefabs include:
 - `SurveyAgent`: Conducts structured surveys with questions and rating scales
 - `ReceptionistAgent`: Greets callers and transfers them to appropriate departments
 
-## Dynamic Agent Configuration
+### Dynamic Agent Configuration
 
 Configure agents dynamically based on request parameters for multi-tenant applications, A/B testing, and personalization.
 
-### Static vs Dynamic Configuration
+#### Static vs Dynamic Configuration
 
 - **Static**: Agent configured once at startup (traditional approach)
 - **Dynamic**: Agent configured fresh for each request based on parameters
 
-### Basic Example
+#### Basic Example
 
 ```python
 from signalwire_agents import AgentBase
@@ -598,7 +646,7 @@ class DynamicAgent(AgentBase):
 # curl "http://localhost:3000/dynamic?tier=standard&language=en"
 ```
 
-### Use Cases
+#### Use Cases
 
 - **Multi-tenant SaaS**: Different configurations per customer/organization
 - **A/B Testing**: Test different agent behaviors with different user groups
@@ -606,7 +654,7 @@ class DynamicAgent(AgentBase):
 - **Localization**: Language and cultural adaptation based on user location
 - **Dynamic Pricing**: Adjust features and capabilities based on subscription tiers
 
-### Preserving Dynamic State in SWAIG Callbacks
+#### Preserving Dynamic State in SWAIG Callbacks
 
 When using dynamic configuration to add skills or tools based on request parameters, there's a challenge: SWAIG webhook callbacks are separate HTTP requests that won't have the original query parameters. The SDK provides `add_swaig_query_params()` to solve this:
 
@@ -652,9 +700,9 @@ This ensures that any dynamic configuration based on request parameters is consi
 
 For detailed documentation and advanced examples, see the [Agent Guide](docs/agent_guide.md#dynamic-agent-configuration).
 
-## Configuration
+### Configuration
 
-### Environment Variables
+#### Environment Variables
 
 The SDK supports the following environment variables:
 
@@ -671,14 +719,14 @@ When the auth environment variables are set, they will be used for all agents in
 
 To enable HTTPS directly (without a reverse proxy), set `SWML_SSL_ENABLED` to "true", provide valid paths to your certificate and key files, and specify your domain name.
 
-## Testing
+### Testing
 
 The SDK includes powerful CLI tools for development and testing:
 
 - **`swaig-test`**: Comprehensive local testing and serverless environment simulation
 - **`sw-search`**: Build local search indexes from document directories and search within them
 
-### Local Testing with swaig-test
+#### Local Testing with swaig-test
 
 Test your agents locally without deployment:
 
@@ -700,7 +748,7 @@ swaig-test examples/my_agent.py --dump-swml
 swaig-test examples/my_agent.py --dump-swml --format-json | jq '.'
 ```
 
-### Serverless Environment Simulation
+#### Serverless Environment Simulation
 
 Test your agents in simulated serverless environments without deployment:
 
@@ -733,7 +781,7 @@ swaig-test examples/my_agent.py --simulate-serverless azure_function \
   --exec my_function
 ```
 
-### Environment Management
+#### Environment Management
 
 Use environment files for consistent testing across platforms:
 
@@ -755,7 +803,7 @@ swaig-test examples/my_agent.py --simulate-serverless lambda \
   --env-file production.env --env DEBUG=true --dump-swml
 ```
 
-### Cross-Platform Testing
+#### Cross-Platform Testing
 
 Test the same agent across multiple serverless platforms:
 
@@ -772,7 +820,7 @@ swaig-test examples/my_agent.py --simulate-serverless lambda --dump-swml | grep 
 swaig-test examples/my_agent.py --simulate-serverless cgi --cgi-host example.com --dump-swml | grep web_hook_url
 ```
 
-### Key Benefits
+#### Key Benefits
 
 - **No Deployment Required**: Test serverless behavior locally
 - **Environment Simulation**: Complete platform-specific environment variable setup
@@ -783,7 +831,7 @@ swaig-test examples/my_agent.py --simulate-serverless cgi --cgi-host example.com
 
 For detailed testing documentation, see the [CLI Testing Guide](docs/cli_testing_guide.md).
 
-## Documentation
+### Documentation
 
 The package includes comprehensive documentation in the `docs/` directory:
 
@@ -795,6 +843,12 @@ The package includes comprehensive documentation in the `docs/` directory:
 - [CLI Tools](docs/cli.md) - Command-line interface tools for development and testing
 
 These documents provide in-depth explanations of the features, APIs, and usage patterns.
+
+</details
+
+### ***[Read the official docs.]([url](https://developer.signalwire.com/sdks/agents-sdk))***
+
+---
 
 ## License
 
