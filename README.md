@@ -24,12 +24,16 @@
     <img src="https://img.shields.io/github/stars/signalwire/signalwire-agents" alt="GitHub Stars" href="https://github.com/signalwire/docs"/>
 </div>
 
+<br/>
+
+<img src="https://github.com/user-attachments/assets/c2510c86-ae03-42a9-be06-ab9bcea948e1" alt="Sign Up" href="https://signalwire.com/signup" height="65"/>
+
 </div>
 
 ## Features
 
 |                   |                                                                  |
-|-------------------------------|-----------------------------------------------------------------------------|
+|-------------------------------|:-----------------------------------------------------------------------------:|
 | 🤖     **Self-Contained Agents** | Each agent is both a web app and an AI persona                            |
 | 📝     **Prompt Object Model**   | Structured prompt composition using POM                                   |
 | ⚙️     **SWAIG Integration**     | Easily define and handle AI tools/functions                               |
@@ -42,6 +46,85 @@
 | 🏢     **Multi-Agent Support**   | Host multiple agents on a single server                                  |
 | �      **Modular Skills System** | Add capabilities to agents with simple one-liner calls                   |
 | 🔍     **Local Search System**   | Offline document search with vector similarity and keyword search        |
+
+## Installation
+
+### Basic Installation
+
+```bash
+pip install signalwire-agents
+```
+
+### Optional Search Functionality
+
+The SDK includes optional local search capabilities that can be installed separately to avoid adding large dependencies to the base installation:
+
+#### Search Installation Options
+
+```bash
+# Query existing .swsearch files only (smallest footprint)
+pip install signalwire-agents[search-queryonly]
+
+# Basic search (vector search + keyword search + building indexes)
+pip install signalwire-agents[search]
+
+# Full search with document processing (PDF, DOCX, etc.)
+pip install signalwire-agents[search-full]
+
+# Advanced NLP features (includes spaCy)
+pip install signalwire-agents[search-nlp]
+
+# All search features
+pip install signalwire-agents[search-all]
+```
+
+#### What Each Option Includes
+
+| Option | Size | Features |
+|--------|------|----------|
+| `search-queryonly` | ~400MB | Query existing .swsearch files only (no building/processing) |
+| `search` | ~500MB | Vector embeddings, keyword search, basic text processing |
+| `search-full` | ~600MB | + PDF, DOCX, Excel, PowerPoint, HTML, Markdown processing |
+| `search-nlp` | ~600MB | + Advanced spaCy NLP features |
+| `search-all` | ~700MB | All search features combined |
+
+**When to use `search-queryonly`:**
+- Production containers with pre-built `.swsearch` files
+- Lambda/serverless deployments
+- Agents that only need to query knowledge bases (not build them)
+- Smaller deployment footprint requirements
+
+#### Search Features
+
+- **Local/Offline Search**: No external API dependencies
+- **Hybrid Search**: Vector similarity + keyword search
+- **Smart Document Processing**: Markdown, Python, PDF, DOCX, etc.
+- **Multiple Languages**: English, Spanish, with extensible framework
+- **CLI Tools**: Build search indexes from document directories
+- **HTTP API**: Standalone or embedded search service
+
+#### Usage Example
+
+```python
+# Only available with search extras installed
+from signalwire_agents.search import IndexBuilder, SearchEngine
+
+# Build search index
+builder = IndexBuilder()
+builder.build_index(
+    source_dir="./docs",
+    output_file="knowledge.swsearch",
+    file_types=['md', 'txt', 'pdf']
+)
+
+# Search documents
+engine = SearchEngine("knowledge.swsearch")
+results = engine.search(
+    query_vector=embeddings,
+    enhanced_text="search query",
+    count=5
+)
+```
 
 <details>
 <summary><h2>Documentation</h2></summary>
@@ -435,85 +518,6 @@ agent.serve()
 - **Scalability**: Complex multi-step processes are easier to maintain
 
 For detailed documentation and advanced examples, see [Contexts and Steps Guide](docs/contexts_guide.md).
-
-### Installation
-
-#### Basic Installation
-
-```bash
-pip install signalwire-agents
-```
-
-#### Optional Search Functionality
-
-The SDK includes optional local search capabilities that can be installed separately to avoid adding large dependencies to the base installation:
-
-##### Search Installation Options
-
-```bash
-# Query existing .swsearch files only (smallest footprint)
-pip install signalwire-agents[search-queryonly]
-
-# Basic search (vector search + keyword search + building indexes)
-pip install signalwire-agents[search]
-
-# Full search with document processing (PDF, DOCX, etc.)
-pip install signalwire-agents[search-full]
-
-# Advanced NLP features (includes spaCy)
-pip install signalwire-agents[search-nlp]
-
-# All search features
-pip install signalwire-agents[search-all]
-```
-
-##### What Each Option Includes
-
-| Option | Size | Features |
-|--------|------|----------|
-| `search-queryonly` | ~400MB | Query existing .swsearch files only (no building/processing) |
-| `search` | ~500MB | Vector embeddings, keyword search, basic text processing |
-| `search-full` | ~600MB | + PDF, DOCX, Excel, PowerPoint, HTML, Markdown processing |
-| `search-nlp` | ~600MB | + Advanced spaCy NLP features |
-| `search-all` | ~700MB | All search features combined |
-
-**When to use `search-queryonly`:**
-- Production containers with pre-built `.swsearch` files
-- Lambda/serverless deployments
-- Agents that only need to query knowledge bases (not build them)
-- Smaller deployment footprint requirements
-
-##### Search Features
-
-- **Local/Offline Search**: No external API dependencies
-- **Hybrid Search**: Vector similarity + keyword search
-- **Smart Document Processing**: Markdown, Python, PDF, DOCX, etc.
-- **Multiple Languages**: English, Spanish, with extensible framework
-- **CLI Tools**: Build search indexes from document directories
-- **HTTP API**: Standalone or embedded search service
-
-##### Usage Example
-
-```python
-# Only available with search extras installed
-from signalwire_agents.search import IndexBuilder, SearchEngine
-
-# Build search index
-builder = IndexBuilder()
-builder.build_index(
-    source_dir="./docs",
-    output_file="knowledge.swsearch",
-    file_types=['md', 'txt', 'pdf']
-)
-
-# Search documents
-engine = SearchEngine("knowledge.swsearch")
-results = engine.search(
-    query_vector=embeddings,
-    enhanced_text="search query",
-    count=5
-)
-```
 
 ### Quick Start
 
