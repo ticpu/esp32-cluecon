@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.33] - 2025-06-24
+
+- Version bump
+
 ## [0.1.32] - 2025-06-24
 
 - Version bump
