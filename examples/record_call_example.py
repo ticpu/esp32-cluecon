@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 """
+Copyright (c) 2025 SignalWire
+
+This file is part of the SignalWire AI Agents SDK.
+
+Licensed under the MIT License.
+See LICENSE file in the project root for full license information.
+"""
+
+"""
 Example: Using record_call and stop_record_call virtual helpers
 
 This example shows how to use the new recording virtual helpers to:

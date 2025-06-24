@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 """
+Copyright (c) 2025 SignalWire
+
+This file is part of the SignalWire AI Agents SDK.
+
+Licensed under the MIT License.
+See LICENSE file in the project root for full license information.
+"""
+
+"""
 Test Agent for MCP Gateway Skill
 
 This agent demonstrates using the MCP Gateway skill to interact with MCP services.
