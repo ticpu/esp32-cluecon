@@ -34,7 +34,7 @@ from .config import (
     HELP_DESCRIPTION, HELP_EPILOG_SHORT
 )
 from .core.argparse_helpers import CustomArgumentParser, parse_function_arguments
-from .core.agent_loader import discover_agents_in_file, load_agent_from_file
+from .core.agent_loader import discover_agents_in_file, load_agent_from_file, load_service_from_file
 from .core.dynamic_config import apply_dynamic_config
 from .simulation.mock_env import ServerlessSimulator, create_mock_request, load_env_file
 from .simulation.data_generation import (
@@ -44,7 +44,7 @@ from .simulation.data_generation import (
 from .simulation.data_overrides import apply_overrides, apply_convenience_mappings
 from .execution.datamap_exec import execute_datamap_function
 from .execution.webhook_exec import execute_external_webhook_function
-from .output.swml_dump import handle_dump_swml, setup_raw_mode_suppression
+from .output.swml_dump import handle_dump_swml, setup_output_suppression
 from .output.output_formatter import display_agent_tools, format_result
 
 
@@ -221,9 +221,9 @@ swaig-test agent.py --simulate-serverless cgi --cgi-host example.com --dump-swml
 
 def main():
     """Main entry point for the CLI tool"""
-    # Check for --raw flag and set up suppression early
-    if "--raw" in sys.argv:
-        setup_raw_mode_suppression()
+    # Set up suppression early if we're dumping SWML
+    if "--dump-swml" in sys.argv:
+        setup_output_suppression()
     
     # Check for help sections early
     if "--help-platforms" in sys.argv:
@@ -283,6 +283,10 @@ def main():
     common.add_argument(
         "--agent-class",
         help="Specify agent class (required if file has multiple agents)"
+    )
+    common.add_argument(
+        "--route",
+        help="Specify service by route (e.g., /healthcare, /finance)"
     )
     
     # Actions (choose one)
@@ -444,6 +448,9 @@ def main():
         args.tool_name = None
     
     # Validate arguments
+    if args.route and args.agent_class:
+        parser.error("Cannot specify both --route and --agent-class. Choose one.")
+    
     if not args.list_tools and not args.dump_swml and not args.list_agents:
         if not args.tool_name:
             # If no tool_name and no special flags, default to listing tools
@@ -556,7 +563,13 @@ def main():
         
         # Load the agent
         try:
-            agent = load_agent_from_file(args.agent_path, args.agent_class)
+            # Determine which identifier to use
+            service_identifier = args.route if args.route else args.agent_class
+            prefer_route = bool(args.route)
+            
+            # Use load_service_from_file which handles both routes and class names
+            from signalwire_agents.cli.core.agent_loader import load_service_from_file
+            agent = load_service_from_file(args.agent_path, service_identifier, prefer_route)
         except ValueError as e:
             error_msg = str(e)
             if "Multiple agent classes found" in error_msg and args.list_tools and not args.agent_class:
@@ -615,6 +628,7 @@ def main():
                         print("\n" + "=" * 60)
                         print(f"\nTo use a specific agent, run:")
                         print(f"  swaig-test {args.agent_path} --agent-class <AgentClassName>")
+                        print(f"  swaig-test {args.agent_path} --route <route>")
                         return 0
                 except Exception as discover_error:
                     print(f"Error discovering agents: {discover_error}")

@@ -61,7 +61,58 @@ def display_agent_tools(agent: 'AgentBase', verbose: bool = False) -> None:
                             param_desc = param_def.get('description', 'No description')
                             is_required = param_name in required_fields
                             required_marker = " (required)" if is_required else ""
-                            print(f"      {param_name} ({param_type}){required_marker}: {param_desc}")
+                            
+                            # Build constraint details
+                            constraints = []
+                            
+                            # Enum values
+                            if 'enum' in param_def:
+                                constraints.append(f"options: {', '.join(map(str, param_def['enum']))}")
+                            
+                            # Numeric constraints
+                            if 'minimum' in param_def:
+                                constraints.append(f"min: {param_def['minimum']}")
+                            if 'maximum' in param_def:
+                                constraints.append(f"max: {param_def['maximum']}")
+                            if 'exclusiveMinimum' in param_def:
+                                constraints.append(f"min (exclusive): {param_def['exclusiveMinimum']}")
+                            if 'exclusiveMaximum' in param_def:
+                                constraints.append(f"max (exclusive): {param_def['exclusiveMaximum']}")
+                            if 'multipleOf' in param_def:
+                                constraints.append(f"multiple of: {param_def['multipleOf']}")
+                            
+                            # String constraints
+                            if 'minLength' in param_def:
+                                constraints.append(f"min length: {param_def['minLength']}")
+                            if 'maxLength' in param_def:
+                                constraints.append(f"max length: {param_def['maxLength']}")
+                            if 'pattern' in param_def:
+                                constraints.append(f"pattern: {param_def['pattern']}")
+                            if 'format' in param_def:
+                                constraints.append(f"format: {param_def['format']}")
+                            
+                            # Array constraints
+                            if param_type == 'array':
+                                if 'minItems' in param_def:
+                                    constraints.append(f"min items: {param_def['minItems']}")
+                                if 'maxItems' in param_def:
+                                    constraints.append(f"max items: {param_def['maxItems']}")
+                                if 'uniqueItems' in param_def and param_def['uniqueItems']:
+                                    constraints.append("unique items")
+                                if 'items' in param_def and 'type' in param_def['items']:
+                                    constraints.append(f"item type: {param_def['items']['type']}")
+                            
+                            # Default value
+                            if 'default' in param_def:
+                                constraints.append(f"default: {param_def['default']}")
+                            
+                            # Format the type with constraints
+                            if constraints:
+                                param_type_full = f"{param_type} [{', '.join(constraints)}]"
+                            else:
+                                param_type_full = param_type
+                            
+                            print(f"      {param_name} ({param_type_full}){required_marker}: {param_desc}")
                     else:
                         print(f"    Parameters: None")
                 else:
@@ -103,7 +154,58 @@ def display_agent_tools(agent: 'AgentBase', verbose: bool = False) -> None:
                             param_desc = param_def.get('description', 'No description')
                             is_required = param_name in required_fields
                             required_marker = " (required)" if is_required else ""
-                            print(f"      {param_name} ({param_type}){required_marker}: {param_desc}")
+                            
+                            # Build constraint details
+                            constraints = []
+                            
+                            # Enum values
+                            if 'enum' in param_def:
+                                constraints.append(f"options: {', '.join(map(str, param_def['enum']))}")
+                            
+                            # Numeric constraints
+                            if 'minimum' in param_def:
+                                constraints.append(f"min: {param_def['minimum']}")
+                            if 'maximum' in param_def:
+                                constraints.append(f"max: {param_def['maximum']}")
+                            if 'exclusiveMinimum' in param_def:
+                                constraints.append(f"min (exclusive): {param_def['exclusiveMinimum']}")
+                            if 'exclusiveMaximum' in param_def:
+                                constraints.append(f"max (exclusive): {param_def['exclusiveMaximum']}")
+                            if 'multipleOf' in param_def:
+                                constraints.append(f"multiple of: {param_def['multipleOf']}")
+                            
+                            # String constraints
+                            if 'minLength' in param_def:
+                                constraints.append(f"min length: {param_def['minLength']}")
+                            if 'maxLength' in param_def:
+                                constraints.append(f"max length: {param_def['maxLength']}")
+                            if 'pattern' in param_def:
+                                constraints.append(f"pattern: {param_def['pattern']}")
+                            if 'format' in param_def:
+                                constraints.append(f"format: {param_def['format']}")
+                            
+                            # Array constraints
+                            if param_type == 'array':
+                                if 'minItems' in param_def:
+                                    constraints.append(f"min items: {param_def['minItems']}")
+                                if 'maxItems' in param_def:
+                                    constraints.append(f"max items: {param_def['maxItems']}")
+                                if 'uniqueItems' in param_def and param_def['uniqueItems']:
+                                    constraints.append("unique items")
+                                if 'items' in param_def and 'type' in param_def['items']:
+                                    constraints.append(f"item type: {param_def['items']['type']}")
+                            
+                            # Default value
+                            if 'default' in param_def:
+                                constraints.append(f"default: {param_def['default']}")
+                            
+                            # Format the type with constraints
+                            if constraints:
+                                param_type_full = f"{param_type} [{', '.join(constraints)}]"
+                            else:
+                                param_type_full = param_type
+                            
+                            print(f"      {param_name} ({param_type_full}){required_marker}: {param_desc}")
                     else:
                         print(f"    Parameters: None")
                 else:

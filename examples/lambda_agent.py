@@ -79,23 +79,24 @@ You have access to these functions:
 Always be friendly and helpful!"""
     
     @AgentBase.tool("Greet a user by name")
-    def greet_user(self, name: str = "friend"):
+    def greet_user(self, args, raw_data):
         """
         Greet a user by name
         
         Args:
             name: Name of the user to greet
         """
+        name = args.get("name", "friend")
         return f"Hello {name}! I'm running in AWS Lambda!"
     
     @AgentBase.tool("Get the current time")
-    def get_time(self):
+    def get_time(self, args, raw_data):
         """Get the current time"""
         import datetime
         return f"Current time: {datetime.datetime.now().isoformat()}"
     
     @AgentBase.tool("Check the health status of the Lambda function")
-    def health_status(self):
+    def health_status(self, args, raw_data):
         """Check the health status of the Lambda function"""
         return {
             "status": "healthy",

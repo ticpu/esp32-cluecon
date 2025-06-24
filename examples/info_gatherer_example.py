@@ -59,10 +59,10 @@ def main():
     # you have to set a post prompt to be able to use either of the next two options
 
     # Set the post prompt URL to the remote server, even if you define the on_summary method it will be ignored if you set the post prompt URL
-    #agent.set_post_prompt_url("https://user:password@example.com/ai/post.cgi")
+    agent.set_post_prompt_url("https://user:password@example.com/ai/post.cgi")
     
     # or, if you want to handle the post prompt yourself, you can define the following method which will be called with the summary and raw data
-    def on_summary(self, summary, raw_data=None):
+    def xon_summary(self, summary, raw_data=None):
         """
         Process the collected information summary
         

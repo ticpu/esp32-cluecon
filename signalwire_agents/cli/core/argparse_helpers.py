@@ -144,7 +144,13 @@ def parse_function_arguments(function_args_list: List[str], func_schema: Dict[st
             else:
                 # Need a value
                 if i + 1 >= len(function_args_list):
-                    raise ValueError(f"Parameter --{param_name} requires a value")
+                    # Check if this looks like a CLI flag that was misplaced
+                    if param_name in ['verbose', 'raw', 'help', 'list-tools', 'list-agents', 'dump-swml', 
+                                      'minimal', 'fake-full-data', 'simulate-serverless', 'agent-class', 'route']:
+                        raise ValueError(f"CLI flag --{param_name} must come BEFORE --exec, not after.\n"
+                                       f"Example: swaig-test file.py --{param_name} --exec function_name")
+                    else:
+                        raise ValueError(f"Parameter --{param_name} requires a value")
                 
                 value = function_args_list[i + 1]
                 

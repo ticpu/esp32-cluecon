@@ -109,6 +109,8 @@ class MockRequest:
         self.query_params = MockQueryParams(query_params)
         self._json_body = json_body or {}
         self._body = json.dumps(self._json_body).encode('utf-8')
+        # Add state object for request state (used by FastAPI)
+        self.state = type('State', (), {})()
     
     async def json(self) -> Dict[str, Any]:
         """Return the JSON body"""
