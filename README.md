@@ -846,7 +846,7 @@ These documents provide in-depth explanations of the features, APIs, and usage p
 
 </details
 
-### ***[Read the official docs.]([url](https://developer.signalwire.com/sdks/agents-sdk))***
+### ***[Read the official docs.](https://developer.signalwire.com/sdks/agents-sdk)***
 
 ---
 
