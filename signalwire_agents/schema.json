@@ -6455,6 +6455,20 @@
           "type": "boolean",
           "description": "A boolean value, if set to `true`, the conversation history will be reset and the agent will only have the context of the original system prompt."
         },
+        "enter_fillers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FunctionFillers"
+          },
+          "description": "An array of objects that define the enter fillers for the context. Enter fillers are used when entering the context."
+        },
+        "exit_fillers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FunctionFillers"
+          },
+          "description": "An array of objects that define the exit fillers for the context. Exit fillers are used when exiting the context."
+        },
         "pom": {
           "type": "array",
           "items": {
@@ -6483,6 +6497,20 @@
         "isolated": {
           "type": "boolean",
           "description": "A boolean value, if set to `true`, the conversation history will be reset and the agent will only have the context of the original system prompt."
+        },
+        "enter_fillers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FunctionFillers"
+          },
+          "description": "An array of objects that define the enter fillers for the context. Enter fillers are used when entering the context."
+        },
+        "exit_fillers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FunctionFillers"
+          },
+          "description": "An array of objects that define the exit fillers for the context. Exit fillers are used when exiting the context."
         },
         "text": {
           "type": "string",
@@ -6712,13 +6740,13 @@
     "ContextSteps": {
       "anyOf": [
         {
-          "$ref": "#/$defs/StepTypePOM"
+          "$ref": "#/$defs/ContextPOMSteps"
         },
         {
-          "$ref": "#/$defs/StepTypeText"
+          "$ref": "#/$defs/ContextTextSteps"
         }
       ],
-      "title": "ContextStepsParams union"
+      "title": "Context step - supports either POM or text-based steps"
     },
     "StringProperty": {
       "type": "object",
@@ -7137,25 +7165,128 @@
       ],
       "title": "Action union"
     },
-    "StepTypePOM": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/POMEndStep"
+    "ContextPOMSteps": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^(?!next$).*$",
+          "description": "The name of the step. The name must be unique within the context. The name is used for referencing the step in the context."
         },
-        {
-          "$ref": "#/$defs/POMValidSteps"
+        "step_criteria": {
+          "type": "string",
+          "description": "The conditions that must be met for the conversation to proceed to the next step. \nIf a condition is not met, the conversation will not proceed to the next step.\nIt's **highly** recommended you create a custom criteria for the step to get the intended behavior.   "
+        },
+        "functions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of strings, where each string is the name of a SWAIG.function that can be executed from this step."
+        },
+        "valid_contexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of valid contexts that the conversation can transition to from this step."
+        },
+        "skip_user_turn": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/SWMLVar"
+            }
+          ],
+          "description": "A boolean value, if set to `true`, will skip the user's turn to respond in the conversation and proceed to the next step."
+        },
+        "end": {
+          "type": "boolean",
+          "description": "A boolean value, if set to `true`, will end the contexts conversation and transition to a normal interaction."
+        },
+        "valid_steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of valid steps that the conversation can proceed to from this step.\nIf the array is empty, or the `valid_steps` key is not present, the conversation will proceed to the next step in the context."
+        },
+        "pom": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/POM"
+          },
+          "description": "An array of objects that define the POM for the step. POM is the Post-Prompt Object Model, which is used to define the flow of the conversation."
         }
-      ]
+      },
+      "required": [
+        "name",
+        "pom"
+      ],
+      "title": "Context step with POM (Post-Prompt Object Model)",
+      "unevaluatedProperties": false
     },
-    "StepTypeText": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/TextEndStep"
+    "ContextTextSteps": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^(?!next$).*$",
+          "description": "The name of the step. The name must be unique within the context. The name is used for referencing the step in the context."
         },
-        {
-          "$ref": "#/$defs/TextValidSteps"
+        "step_criteria": {
+          "type": "string",
+          "description": "The conditions that must be met for the conversation to proceed to the next step. \nIf a condition is not met, the conversation will not proceed to the next step.\nIt's **highly** recommended you create a custom criteria for the step to get the intended behavior.   "
+        },
+        "functions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of strings, where each string is the name of a SWAIG.function that can be executed from this step."
+        },
+        "valid_contexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of valid contexts that the conversation can transition to from this step."
+        },
+        "skip_user_turn": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/SWMLVar"
+            }
+          ],
+          "description": "A boolean value, if set to `true`, will skip the user's turn to respond in the conversation and proceed to the next step."
+        },
+        "end": {
+          "type": "boolean",
+          "description": "A boolean value, if set to `true`, will end the contexts conversation and transition to a normal interaction."
+        },
+        "valid_steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of valid steps that the conversation can proceed to from this step.\nIf the array is empty, or the `valid_steps` key is not present, the conversation will proceed to the next step in the context."
+        },
+        "text": {
+          "type": "string",
+          "description": "The prompt or instructions given to the AI at this step."
         }
-      ]
+      },
+      "required": [
+        "name",
+        "text"
+      ],
+      "title": "Context step with text prompt",
+      "unevaluatedProperties": false
     },
     "StringFormat": {
       "type": "string",
@@ -7468,230 +7599,6 @@
         "user_input"
       ],
       "title": "UserInputAction object",
-      "unevaluatedProperties": false
-    },
-    "POMEndStep": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "pattern": "^(?!next$).*$",
-          "description": "The name of the step. The name must be unique within the context. The name is used for referencing the step in the context."
-        },
-        "step_criteria": {
-          "type": "string",
-          "description": "The conditions that must be met for the conversation to proceed to the next step. \nIf a condition is not met, the conversation will not proceed to the next step.\nIt's **highly** recommended you create a custom criteria for the step to get the intended behavior.   "
-        },
-        "functions": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "An array of strings, where each string is the name of a SWAIG.function that can be executed from this step."
-        },
-        "valid_contexts": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "An array of valid contexts that the conversation can transition to from this step."
-        },
-        "skip_user_turn": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "$ref": "#/$defs/SWMLVar"
-            }
-          ],
-          "description": "A boolean value, if set to `true`, will skip the user's turn to respond in the conversation and proceed to the next step."
-        },
-        "pom": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/POM"
-          },
-          "description": "An array of objects that define the POM for the step. POM is the Post-Prompt Object Model, which is used to define the flow of the conversation."
-        },
-        "end": {
-          "type": "boolean",
-          "description": "A boolean value, if set to `true`, will end the contexts conversation and transition to a normal interaction."
-        }
-      },
-      "required": [
-        "name",
-        "pom"
-      ],
-      "title": "ContextStepsEnd object",
-      "unevaluatedProperties": false
-    },
-    "POMValidSteps": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "pattern": "^(?!next$).*$",
-          "description": "The name of the step. The name must be unique within the context. The name is used for referencing the step in the context."
-        },
-        "step_criteria": {
-          "type": "string",
-          "description": "The conditions that must be met for the conversation to proceed to the next step. \nIf a condition is not met, the conversation will not proceed to the next step.\nIt's **highly** recommended you create a custom criteria for the step to get the intended behavior.   "
-        },
-        "functions": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "An array of strings, where each string is the name of a SWAIG.function that can be executed from this step."
-        },
-        "valid_contexts": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "An array of valid contexts that the conversation can transition to from this step."
-        },
-        "skip_user_turn": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "$ref": "#/$defs/SWMLVar"
-            }
-          ],
-          "description": "A boolean value, if set to `true`, will skip the user's turn to respond in the conversation and proceed to the next step."
-        },
-        "pom": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/POM"
-          },
-          "description": "An array of objects that define the POM for the step. POM is the Post-Prompt Object Model, which is used to define the flow of the conversation."
-        },
-        "valid_steps": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "An array of valid steps that the conversation can proceed to from this step.\nIf the array is empty, or the `valid_steps` key is not present, the conversation will proceed to the next step in the context."
-        }
-      },
-      "required": [
-        "name",
-        "pom"
-      ],
-      "title": "ContextStepsValidSteps object",
-      "unevaluatedProperties": false
-    },
-    "TextEndStep": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "pattern": "^(?!next$).*$",
-          "description": "The name of the step. The name must be unique within the context. The name is used for referencing the step in the context."
-        },
-        "step_criteria": {
-          "type": "string",
-          "description": "The conditions that must be met for the conversation to proceed to the next step. \nIf a condition is not met, the conversation will not proceed to the next step.\nIt's **highly** recommended you create a custom criteria for the step to get the intended behavior.   "
-        },
-        "functions": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "An array of strings, where each string is the name of a SWAIG.function that can be executed from this step."
-        },
-        "valid_contexts": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "An array of valid contexts that the conversation can transition to from this step."
-        },
-        "skip_user_turn": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "$ref": "#/$defs/SWMLVar"
-            }
-          ],
-          "description": "A boolean value, if set to `true`, will skip the user's turn to respond in the conversation and proceed to the next step."
-        },
-        "text": {
-          "type": "string",
-          "description": "The prompt or instructions given to the AI at this step."
-        },
-        "end": {
-          "type": "boolean",
-          "description": "A boolean value, if set to `true`, will end the contexts conversation and transition to a normal interaction."
-        }
-      },
-      "required": [
-        "name",
-        "text"
-      ],
-      "title": "ContextStepsBase object",
-      "unevaluatedProperties": false
-    },
-    "TextValidSteps": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "pattern": "^(?!next$).*$",
-          "description": "The name of the step. The name must be unique within the context. The name is used for referencing the step in the context."
-        },
-        "step_criteria": {
-          "type": "string",
-          "description": "The conditions that must be met for the conversation to proceed to the next step. \nIf a condition is not met, the conversation will not proceed to the next step.\nIt's **highly** recommended you create a custom criteria for the step to get the intended behavior.   "
-        },
-        "functions": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "An array of strings, where each string is the name of a SWAIG.function that can be executed from this step."
-        },
-        "valid_contexts": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "An array of valid contexts that the conversation can transition to from this step."
-        },
-        "skip_user_turn": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "$ref": "#/$defs/SWMLVar"
-            }
-          ],
-          "description": "A boolean value, if set to `true`, will skip the user's turn to respond in the conversation and proceed to the next step."
-        },
-        "text": {
-          "type": "string",
-          "description": "The prompt or instructions given to the AI at this step."
-        },
-        "valid_steps": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "An array of valid steps that the conversation can proceed to from this step.\nIf the array is empty, or the `valid_steps` key is not present, the conversation will proceed to the next step in the context."
-        }
-      },
-      "required": [
-        "name",
-        "text"
-      ],
-      "title": "ContextStepsBase object",
       "unevaluatedProperties": false
     }
   },
