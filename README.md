@@ -43,8 +43,6 @@
 | �      **Modular Skills System** | Add capabilities to agents with simple one-liner calls                   |
 | 🔍     **Local Search System**   | Offline document search with vector similarity and keyword search        |
 
-<iframe style="width:100%;height:auto;min-width:600px;min-height:400px;" src="https://www.star-history.com/embed?secret=Z2l0aHViX3BhdF8xMUEyM1JQQVkwc3ZMaEpUcU42Y3JQX1ZBVzhQdE5pb2NOSWFhZGNyV1R1cEVVR0dLdElNUlc3ZjdkVGVVRWhDSXZVRVpFQ0M3WTBTVWl2WmU0#signalwire/signalwire-agents&Date" frameBorder="0"></iframe>
-
 <details>
 <summary><h2>Documentation</h2></summary>
 
