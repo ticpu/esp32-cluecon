@@ -1,6 +1,8 @@
 <!-- Header -->
 <div align="center">
-    <img src="https://github.com/user-attachments/assets/0c8ed3b9-8c50-4dc6-9cc4-cc6cd137fd50" width="500" href="https://signalwire.com" />
+    <a href="https://signalwire.com" target="_blank">
+        <img src="https://github.com/user-attachments/assets/0c8ed3b9-8c50-4dc6-9cc4-cc6cd137fd50" width="500" />
+    </a>
 
 # Agents SDK
 
@@ -18,15 +20,17 @@
 
 <!-- Badges -->
 <div align="center">
-    <img src="https://img.shields.io/badge/Discord%20Community-5865F2" alt="Discord" href="https://discord.com/invite/F2WNYTNjuF"/>
-    <img src="https://img.shields.io/badge/MIT-License-blue" alt="MIT License" href="LICENSE" />
-    <img src="https://img.shields.io/badge/GitHub-%23121011.svg?logo=github&logoColor=white&" alt="GitHub" href="https://github.com/signalwire"/>
-    <img src="https://img.shields.io/github/stars/signalwire/signalwire-agents" alt="GitHub Stars" href="https://github.com/signalwire/docs"/>
+    <a href="https://discord.com/invite/F2WNYTNjuF" target="_blank"><img src="https://img.shields.io/badge/Discord%20Community-5865F2" alt="Discord" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/MIT-License-blue" alt="MIT License" /></a>
+    <a href="https://github.com/signalwire" target="_blank"><img src="https://img.shields.io/badge/GitHub-%23121011.svg?logo=github&logoColor=white&" alt="GitHub" /></a>
+    <a href="https://github.com/signalwire/docs" target="_blank"><img src="https://img.shields.io/github/stars/signalwire/signalwire-agents" alt="GitHub Stars" /></a>
 </div>
 
 <br/>
 
-<img src="https://github.com/user-attachments/assets/c2510c86-ae03-42a9-be06-ab9bcea948e1" alt="Sign Up" href="https://signalwire.com/signup" height="65"/>
+<a href="https://signalwire.com/signup" target="_blank">
+    <img src="https://github.com/user-attachments/assets/c2510c86-ae03-42a9-be06-ab9bcea948e1" alt="Sign Up" height="65"/>
+</a>
 
 </div>
 
