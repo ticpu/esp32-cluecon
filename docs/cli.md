@@ -126,6 +126,9 @@ swaig-test <agent_file> [function_name] [options]
 - Generate and validate SWML documents
 - Simulate serverless environments (Lambda, CGI, Cloud Functions, Azure Functions)
 - Auto-discover agents and functions
+- Multi-agent support with --route and --agent-class selection
+- Automatic log suppression (use --verbose to enable logs)
+- Enhanced parameter display showing all JSON Schema constraints
 - Environment variable management
 - HTTP request simulation
 - Call configuration options
@@ -139,11 +142,19 @@ swaig-test examples/my_agent.py --list-agents
 # List available functions
 swaig-test examples/my_agent.py --list-tools
 
+# Multi-agent support
+swaig-test examples/multi_agent.py --route /agent-path --list-tools
+swaig-test examples/multi_agent.py --agent-class AgentName --exec function_name
+
 # Test SWML generation
 swaig-test examples/my_agent.py --dump-swml
 
 # Test a specific function
 swaig-test examples/my_agent.py --exec my_function --param value
+
+# Control logging output
+swaig-test examples/my_agent.py --exec function_name  # Logs suppressed by default
+swaig-test examples/my_agent.py --verbose --exec function_name  # Show logs
 ```
 
 **Serverless Environment Simulation:**

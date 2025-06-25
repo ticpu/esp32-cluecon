@@ -728,9 +728,13 @@ swaig-test examples/my_agent.py --list-tools
 # Test SWAIG functions with CLI syntax
 swaig-test examples/my_agent.py --exec get_weather --location "New York"
 
+# Multi-agent support
+swaig-test examples/multi_agent.py --route /agent-path --list-tools
+swaig-test examples/multi_agent.py --agent-class AgentName --exec function_name
+
 # Generate and inspect SWML documents
 swaig-test examples/my_agent.py --dump-swml
-swaig-test examples/my_agent.py --dump-swml --format-json | jq '.'
+swaig-test examples/my_agent.py --dump-swml --raw | jq '.'
 ```
 
 #### Serverless Environment Simulation

@@ -29,6 +29,8 @@ The tool automatically detects function types, provides appropriate execution en
 - **Verbose Debugging**: Detailed execution tracing for both function types
 - **Flexible Data Modes**: Choose between minimal, comprehensive, or custom post_data
 - **Serverless Environment Simulation**: Complete platform simulation for Lambda, CGI, Cloud Functions, and Azure Functions with environment variable management
+- **Automatic Log Suppression**: Logs are suppressed by default unless `--verbose` flag is used
+- **Enhanced Parameter Display**: Shows all JSON Schema constraints including enum values, min/max, patterns, and more
 
 ## Installation
 
@@ -74,10 +76,13 @@ Available agents in matti_and_sigmond/dual_agent_app.py:
 
 To use a specific agent with this tool:
   swaig-test matti_and_sigmond/dual_agent_app.py [tool_name] [args] --agent-class <AgentClassName>
+  swaig-test matti_and_sigmond/dual_agent_app.py [tool_name] [args] --route <route_path>
 
 Examples:
   swaig-test matti_and_sigmond/dual_agent_app.py --list-tools --agent-class MattiAgent
   swaig-test matti_and_sigmond/dual_agent_app.py --dump-swml --agent-class SigmondAgent
+  swaig-test matti_and_sigmond/dual_agent_app.py --list-tools --route /matti-agent
+  swaig-test matti_and_sigmond/dual_agent_app.py --dump-swml --route /sigmond-agent
 ```
 
 ### List Available Functions
@@ -89,6 +94,9 @@ swaig-test examples/joke_skill_demo.py --list-tools
 # List functions for specific agent in multi-agent file
 swaig-test matti_and_sigmond/dual_agent_app.py --agent-class MattiAgent --list-tools
 
+# List functions using route selection
+swaig-test matti_and_sigmond/dual_agent_app.py --route /matti-agent --list-tools
+
 # Detailed function listing with schemas
 swaig-test examples/joke_skill_demo.py --list-tools --verbose
 ```
@@ -98,13 +106,13 @@ swaig-test examples/joke_skill_demo.py --list-tools --verbose
 Available SWAIG functions:
   get_joke - Get a random joke from API Ninjas (DataMap function - serverless)
     Parameters:
-      type (string) (required): Type of joke to get
+      type (string [options: jokes, dadjokes]) (required): Type of joke to get
     Config: {"data_map": {...}, "parameters": {...}}
       
   calculate - Perform mathematical calculations and return the result (LOCAL webhook)
     Parameters:
       expression (string) (required): Mathematical expression to evaluate
-      precision (integer): Number of decimal places (default: 2)
+      precision (integer [min: 0, max: 10]): Number of decimal places (default: 2)
 ```
 
 ### Test SWML Generation
@@ -126,6 +134,26 @@ swaig-test examples/my_agent.py --dump-swml --call-type sip --call-direction out
 swaig-test examples/my_agent.py --simulate-serverless lambda --dump-swml
 swaig-test examples/my_agent.py --simulate-serverless cgi --cgi-host example.com --dump-swml
 ```
+
+## Logging and Output Control
+
+By default, `swaig-test` suppresses agent logs to keep output clean. Use these options to control logging:
+
+```bash
+# Default behavior - logs are suppressed
+swaig-test examples/my_agent.py --exec my_function --param value
+
+# Enable logs with --verbose flag  
+swaig-test examples/my_agent.py --verbose --exec my_function --param value
+
+# Clean SWML output (logs always suppressed)
+swaig-test examples/my_agent.py --dump-swml --raw
+```
+
+The tool automatically:
+- Suppresses logs by default for cleaner output
+- Shows logs when `--verbose` is specified
+- Always suppresses output when using `--dump-swml` to ensure valid JSON
 
 ## Serverless Environment Simulation
 
@@ -1324,9 +1352,10 @@ Available SWAIG functions:
 |--------|-------------|
 | `--exec FUNCTION` | Execute function with CLI-style arguments (recommended) |
 | `--agent-class CLASS` | Specify agent class for multi-agent files |
+| `--route ROUTE` | Select agent by route path (e.g., /matti-agent) |
 | `--list-agents` | List all available agents in the file |
 | `--list-tools` | List all available SWAIG functions and their types |
-| `--verbose`, `-v` | Enable detailed execution tracing and debugging |
+| `--verbose`, `-v` | Enable detailed execution tracing and debugging (also shows logs) |
 | `--fake-full-data` | Generate comprehensive post_data with all SignalWire metadata |
 | `--minimal` | Use minimal post_data (essential keys only) |
 | `--custom-data` | JSON string with custom post_data overrides |
