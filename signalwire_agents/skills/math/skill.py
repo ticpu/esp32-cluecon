@@ -88,4 +88,19 @@ class MathSkill(SkillBase):
                     "Can handle parentheses for complex expressions"
                 ]
             }
-        ] 
+        ]
+    
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """
+        Get the parameter schema for the math skill
+        
+        The math skill has no custom parameters - it inherits only
+        the base parameters from SkillBase.
+        """
+        # Get base schema from parent
+        schema = super().get_parameter_schema()
+        
+        # No additional parameters for math skill
+        
+        return schema 

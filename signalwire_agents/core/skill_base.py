@@ -114,4 +114,67 @@ class SkillBase(ABC):
             
         # For multi-instance skills, create key from skill name + tool name
         tool_name = self.params.get('tool_name', self.SKILL_NAME)
-        return f"{self.SKILL_NAME}_{tool_name}" 
+        return f"{self.SKILL_NAME}_{tool_name}"
+    
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """
+        Get the parameter schema for this skill
+        
+        This method returns metadata about all parameters the skill accepts,
+        including their types, descriptions, default values, and whether they
+        are required or should be hidden (e.g., API keys).
+        
+        The base implementation provides common parameters available to all skills.
+        Subclasses should override this method and merge their specific parameters
+        with the base schema.
+        
+        Returns:
+            Dict[str, Dict[str, Any]]: Parameter schema where keys are parameter names
+            and values are dictionaries containing:
+                - type: Parameter type ("string", "integer", "number", "boolean", "object", "array")
+                - description: Human-readable description
+                - default: Default value if not provided (optional)
+                - required: Whether the parameter is required (default: False)
+                - hidden: Whether to hide this field in UIs (for secrets/keys)
+                - env_var: Environment variable that can provide this value (optional)
+                - enum: List of allowed values (optional)
+                - min/max: Minimum/maximum values for numeric types (optional)
+        
+        Example:
+            {
+                "tool_name": {
+                    "type": "string",
+                    "description": "Name for the tool when using multiple instances",
+                    "default": "my_skill",
+                    "required": False
+                },
+                "api_key": {
+                    "type": "string",
+                    "description": "API key for the service",
+                    "required": True,
+                    "hidden": True,
+                    "env_var": "MY_API_KEY"
+                }
+            }
+        """
+        schema = {}
+        
+        # Add swaig_fields parameter (available to all skills)
+        schema["swaig_fields"] = {
+            "type": "object",
+            "description": "Additional SWAIG function metadata to merge into tool definitions",
+            "default": {},
+            "required": False
+        }
+        
+        # Add tool_name for multi-instance skills
+        if cls.SUPPORTS_MULTIPLE_INSTANCES:
+            schema["tool_name"] = {
+                "type": "string",
+                "description": "Custom name for this skill instance (for multiple instances)",
+                "default": cls.SKILL_NAME,
+                "required": False
+            }
+        
+        return schema 

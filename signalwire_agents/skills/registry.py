@@ -23,28 +23,61 @@ class SkillRegistry:
     
     def __init__(self):
         self._skills: Dict[str, Type[SkillBase]] = {}
+        self._external_paths: List[Path] = []  # Additional paths to search for skills
+        self._entry_points_loaded = False
         self.logger = get_logger("skill_registry")
-        # Remove _discovered flag since we're not doing discovery anymore
     
     def _load_skill_on_demand(self, skill_name: str) -> Optional[Type[SkillBase]]:
         """Load a skill on-demand by name"""
         if skill_name in self._skills:
             return self._skills[skill_name]
-            
-        # Try to load the skill from its expected directory
+        
+        # First, ensure entry points are loaded
+        self._load_entry_points()
+        
+        # Check if skill was loaded from entry points
+        if skill_name in self._skills:
+            return self._skills[skill_name]
+        
+        # Search in built-in skills directory
         skills_dir = Path(__file__).parent
-        skill_dir = skills_dir / skill_name
+        skill_class = self._load_skill_from_path(skill_name, skills_dir)
+        if skill_class:
+            return skill_class
+        
+        # Search in external paths
+        for external_path in self._external_paths:
+            skill_class = self._load_skill_from_path(skill_name, external_path)
+            if skill_class:
+                return skill_class
+        
+        # Search in environment variable paths
+        env_paths = os.environ.get('SIGNALWIRE_SKILL_PATHS', '').split(':')
+        for path_str in env_paths:
+            if path_str:
+                skill_class = self._load_skill_from_path(skill_name, Path(path_str))
+                if skill_class:
+                    return skill_class
+        
+        self.logger.debug(f"Skill '{skill_name}' not found in any registered paths")
+        return None
+    
+    def _load_skill_from_path(self, skill_name: str, base_path: Path) -> Optional[Type[SkillBase]]:
+        """Try to load a skill from a specific base path"""
+        skill_dir = base_path / skill_name
         skill_file = skill_dir / "skill.py"
         
         if not skill_file.exists():
-            self.logger.debug(f"Skill '{skill_name}' not found at {skill_file}")
             return None
             
         try:
-            # Import the skill module
-            module_name = f"signalwire_agents.skills.{skill_name}.skill"
+            # Create unique module name to avoid conflicts
+            module_name = f"signalwire_agents_external.{base_path.name}.{skill_name}.skill"
             spec = importlib.util.spec_from_file_location(module_name, skill_file)
             module = importlib.util.module_from_spec(spec)
+            
+            # Add to sys.modules to handle relative imports
+            sys.modules[module_name] = module
             spec.loader.exec_module(module)
             
             # Find SkillBase subclasses in the module
@@ -52,6 +85,7 @@ class SkillRegistry:
                 if (inspect.isclass(obj) and 
                     issubclass(obj, SkillBase) and 
                     obj != SkillBase and
+                    hasattr(obj, 'SKILL_NAME') and
                     obj.SKILL_NAME == skill_name):  # Match exact skill name
                     
                     self.register_skill(obj)
@@ -75,7 +109,25 @@ class SkillRegistry:
         pass
     
     def register_skill(self, skill_class: Type[SkillBase]) -> None:
-        """Register a skill class"""
+        """
+        Register a skill class directly
+        
+        This allows third-party code to register skill classes without
+        requiring them to be in a specific directory structure.
+        
+        Args:
+            skill_class: A class that inherits from SkillBase
+            
+        Example:
+            from my_custom_skills import MyWeatherSkill
+            skill_registry.register_skill(MyWeatherSkill)
+        """
+        if not issubclass(skill_class, SkillBase):
+            raise ValueError(f"{skill_class} must inherit from SkillBase")
+            
+        if not hasattr(skill_class, 'SKILL_NAME') or skill_class.SKILL_NAME is None:
+            raise ValueError(f"{skill_class} must define SKILL_NAME")
+            
         if skill_class.SKILL_NAME in self._skills:
             self.logger.warning(f"Skill '{skill_class.SKILL_NAME}' already registered")
             return
@@ -115,6 +167,257 @@ class SkillRegistry:
                         })
         
         return available_skills
+    
+    def get_all_skills_schema(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get complete schema for all available skills including parameter metadata
+        
+        This method scans all available skills and returns a comprehensive schema
+        that includes skill metadata and parameter definitions suitable for GUI
+        configuration or API documentation.
+        
+        Returns:
+            Dict[str, Dict[str, Any]]: Complete skill schema where keys are skill names
+            and values contain:
+                - name: Skill name
+                - description: Skill description
+                - version: Skill version
+                - supports_multiple_instances: Whether multiple instances are allowed
+                - required_packages: List of required Python packages
+                - required_env_vars: List of required environment variables
+                - parameters: Parameter schema from get_parameter_schema()
+                - source: Where the skill was loaded from ('built-in', 'external', 'entry_point', 'registered')
+        
+        Example:
+            {
+                "web_search": {
+                    "name": "web_search",
+                    "description": "Search the web for information",
+                    "version": "1.0.0",
+                    "supports_multiple_instances": True,
+                    "required_packages": ["bs4", "requests"],
+                    "required_env_vars": [],
+                    "parameters": {
+                        "api_key": {
+                            "type": "string",
+                            "description": "Google API key",
+                            "required": True,
+                            "hidden": True,
+                            "env_var": "GOOGLE_SEARCH_API_KEY"
+                        },
+                        ...
+                    },
+                    "source": "built-in"
+                }
+            }
+        """
+        skills_schema = {}
+        
+        # Load entry points first
+        self._load_entry_points()
+        
+        # Helper function to add skill to schema
+        def add_skill_to_schema(skill_class, source):
+            try:
+                # Get parameter schema
+                try:
+                    parameter_schema = skill_class.get_parameter_schema()
+                except AttributeError:
+                    # Skill doesn't implement get_parameter_schema yet
+                    parameter_schema = {}
+                
+                skills_schema[skill_class.SKILL_NAME] = {
+                    "name": skill_class.SKILL_NAME,
+                    "description": skill_class.SKILL_DESCRIPTION,
+                    "version": getattr(skill_class, 'SKILL_VERSION', '1.0.0'),
+                    "supports_multiple_instances": getattr(skill_class, 'SUPPORTS_MULTIPLE_INSTANCES', False),
+                    "required_packages": getattr(skill_class, 'REQUIRED_PACKAGES', []),
+                    "required_env_vars": getattr(skill_class, 'REQUIRED_ENV_VARS', []),
+                    "parameters": parameter_schema,
+                    "source": source
+                }
+            except Exception as e:
+                self.logger.error(f"Failed to get schema for skill '{skill_class.SKILL_NAME}': {e}")
+        
+        # Add already registered skills first (includes entry points)
+        for skill_name, skill_class in self._skills.items():
+            add_skill_to_schema(skill_class, 'registered')
+        
+        # Scan built-in skills directory
+        skills_dir = Path(__file__).parent
+        for item in skills_dir.iterdir():
+            if item.is_dir() and not item.name.startswith('__'):
+                skill_file = item / "skill.py"
+                if skill_file.exists() and item.name not in skills_schema:
+                    try:
+                        skill_class = self._load_skill_on_demand(item.name)
+                        if skill_class:
+                            add_skill_to_schema(skill_class, 'built-in')
+                    except Exception as e:
+                        self.logger.error(f"Failed to load skill '{item.name}': {e}")
+        
+        # Scan external directories
+        for external_path in self._external_paths:
+            if external_path.exists():
+                for item in external_path.iterdir():
+                    if item.is_dir() and not item.name.startswith('__'):
+                        skill_file = item / "skill.py"
+                        if skill_file.exists() and item.name not in skills_schema:
+                            try:
+                                skill_class = self._load_skill_on_demand(item.name)
+                                if skill_class:
+                                    add_skill_to_schema(skill_class, 'external')
+                            except Exception as e:
+                                self.logger.error(f"Failed to load skill '{item.name}': {e}")
+        
+        # Scan environment variable paths
+        env_paths = os.environ.get('SIGNALWIRE_SKILL_PATHS', '').split(':')
+        for path_str in env_paths:
+            if path_str:
+                env_path = Path(path_str)
+                if env_path.exists():
+                    for item in env_path.iterdir():
+                        if item.is_dir() and not item.name.startswith('__'):
+                            skill_file = item / "skill.py"
+                            if skill_file.exists() and item.name not in skills_schema:
+                                try:
+                                    skill_class = self._load_skill_on_demand(item.name)
+                                    if skill_class:
+                                        add_skill_to_schema(skill_class, 'external')
+                                except Exception as e:
+                                    self.logger.error(f"Failed to load skill '{item.name}': {e}")
+        
+        return skills_schema
+    
+    def add_skill_directory(self, path: str) -> None:
+        """
+        Add a directory to search for skills
+        
+        This allows third-party skill collections to be registered by path.
+        Skills in these directories should follow the same structure as built-in skills:
+        - Each skill in its own subdirectory
+        - skill.py file containing the skill class
+        
+        Args:
+            path: Path to directory containing skill subdirectories
+            
+        Example:
+            skill_registry.add_skill_directory('/opt/custom_skills')
+            # Now agent.add_skill('my_custom_skill') will search in this directory
+        """
+        skill_path = Path(path)
+        if not skill_path.exists():
+            raise ValueError(f"Skill directory does not exist: {path}")
+        if not skill_path.is_dir():
+            raise ValueError(f"Path is not a directory: {path}")
+            
+        if skill_path not in self._external_paths:
+            self._external_paths.append(skill_path)
+            self.logger.info(f"Added external skill directory: {path}")
+    
+    def _load_entry_points(self) -> None:
+        """
+        Load skills from Python entry points
+        
+        This allows installed packages to register skills via setup.py:
+        
+        entry_points={
+            'signalwire_agents.skills': [
+                'weather = my_package.skills:WeatherSkill',
+                'stock = my_package.skills:StockSkill',
+            ]
+        }
+        """
+        if self._entry_points_loaded:
+            return
+            
+        self._entry_points_loaded = True
+        
+        try:
+            import pkg_resources
+            
+            for entry_point in pkg_resources.iter_entry_points('signalwire_agents.skills'):
+                try:
+                    skill_class = entry_point.load()
+                    if issubclass(skill_class, SkillBase):
+                        self.register_skill(skill_class)
+                        self.logger.info(f"Loaded skill '{skill_class.SKILL_NAME}' from entry point '{entry_point.name}'")
+                    else:
+                        self.logger.warning(f"Entry point '{entry_point.name}' does not provide a SkillBase subclass")
+                except Exception as e:
+                    self.logger.error(f"Failed to load skill from entry point '{entry_point.name}': {e}")
+                    
+        except ImportError:
+            # pkg_resources not available, try importlib.metadata (Python 3.8+)
+            try:
+                from importlib import metadata
+                
+                entry_points = metadata.entry_points()
+                if hasattr(entry_points, 'select'):
+                    # Python 3.10+
+                    skill_entries = entry_points.select(group='signalwire_agents.skills')
+                else:
+                    # Python 3.8-3.9
+                    skill_entries = entry_points.get('signalwire_agents.skills', [])
+                
+                for entry_point in skill_entries:
+                    try:
+                        skill_class = entry_point.load()
+                        if issubclass(skill_class, SkillBase):
+                            self.register_skill(skill_class)
+                            self.logger.info(f"Loaded skill '{skill_class.SKILL_NAME}' from entry point '{entry_point.name}'")
+                        else:
+                            self.logger.warning(f"Entry point '{entry_point.name}' does not provide a SkillBase subclass")
+                    except Exception as e:
+                        self.logger.error(f"Failed to load skill from entry point '{entry_point.name}': {e}")
+                        
+            except ImportError:
+                # Neither pkg_resources nor importlib.metadata available
+                self.logger.debug("Entry point loading not available - install setuptools or use Python 3.8+")
+    
+    def list_all_skill_sources(self) -> Dict[str, List[str]]:
+        """
+        List all skill sources and the skills available from each
+        
+        Returns a dictionary mapping source types to lists of skill names:
+        {
+            'built-in': ['datetime', 'math', ...],
+            'external_paths': ['custom_skill1', ...],
+            'entry_points': ['weather', ...],
+            'registered': ['my_skill', ...]
+        }
+        """
+        sources = {
+            'built-in': [],
+            'external_paths': [],
+            'entry_points': [],
+            'registered': []
+        }
+        
+        # Built-in skills
+        skills_dir = Path(__file__).parent
+        for item in skills_dir.iterdir():
+            if item.is_dir() and not item.name.startswith('__'):
+                skill_file = item / "skill.py"
+                if skill_file.exists():
+                    sources['built-in'].append(item.name)
+        
+        # External path skills
+        for external_path in self._external_paths:
+            if external_path.exists():
+                for item in external_path.iterdir():
+                    if item.is_dir() and not item.name.startswith('__'):
+                        skill_file = item / "skill.py"
+                        if skill_file.exists():
+                            sources['external_paths'].append(item.name)
+        
+        # Already registered skills
+        for skill_name in self._skills:
+            # Determine source of registered skill
+            if skill_name not in sources['built-in']:
+                sources['registered'].append(skill_name)
+        
+        return sources
 
 # Global registry instance
 skill_registry = SkillRegistry() 

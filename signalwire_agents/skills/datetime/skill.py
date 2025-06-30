@@ -110,4 +110,19 @@ class DateTimeSkill(SkillBase):
                     "Both tools support different timezones"
                 ]
             }
-        ] 
+        ]
+    
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """
+        Get the parameter schema for the datetime skill
+        
+        The datetime skill has no custom parameters - it inherits only
+        the base parameters from SkillBase.
+        """
+        # Get base schema from parent
+        schema = super().get_parameter_schema()
+        
+        # No additional parameters for datetime skill
+        
+        return schema 

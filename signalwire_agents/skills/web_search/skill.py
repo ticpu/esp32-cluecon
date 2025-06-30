@@ -262,4 +262,63 @@ class WebSearchSkill(SkillBase):
                     "Include relevant URLs so users can read more if interested"
                 ]
             }
-        ] 
+        ]
+    
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """
+        Get the parameter schema for the web search skill
+        
+        Returns all configurable parameters for web search including
+        API credentials, search settings, and response customization.
+        """
+        # Get base schema from parent
+        schema = super().get_parameter_schema()
+        
+        # Add web search specific parameters
+        schema.update({
+            "api_key": {
+                "type": "string",
+                "description": "Google Custom Search API key",
+                "required": True,
+                "hidden": True,  # Mark as hidden since it's a secret
+                "env_var": "GOOGLE_SEARCH_API_KEY"
+            },
+            "search_engine_id": {
+                "type": "string",
+                "description": "Google Custom Search Engine ID",
+                "required": True,
+                "hidden": True,  # Also a secret
+                "env_var": "GOOGLE_SEARCH_ENGINE_ID"
+            },
+            "num_results": {
+                "type": "integer",
+                "description": "Default number of search results to return",
+                "default": 1,
+                "required": False,
+                "min": 1,
+                "max": 10
+            },
+            "delay": {
+                "type": "number",
+                "description": "Delay between scraping pages in seconds",
+                "default": 0,
+                "required": False,
+                "min": 0
+            },
+            "max_content_length": {
+                "type": "integer",
+                "description": "Maximum content length per scraped page (characters)",
+                "default": 2000,
+                "required": False,
+                "min": 100
+            },
+            "no_results_message": {
+                "type": "string",
+                "description": "Message to show when no results are found. Use {query} as placeholder.",
+                "default": "I couldn't find any results for '{query}'. This might be due to a very specific query or temporary issues. Try rephrasing your search or asking about a different topic.",
+                "required": False
+            }
+        })
+        
+        return schema 

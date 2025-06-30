@@ -62,6 +62,67 @@ def list_skills(*args, **kwargs):
     except ImportError:
         raise NotImplementedError("CLI helpers not available")
 
+def list_skills_with_params():
+    """
+    Get complete schema for all available skills including parameter metadata
+    
+    This function returns a comprehensive schema for all available skills,
+    including their metadata and parameter definitions. This is useful for
+    GUI configuration tools, API documentation, or programmatic skill discovery.
+    
+    Returns:
+        Dict[str, Dict[str, Any]]: Complete skill schema where keys are skill names
+        
+    Example:
+        >>> schema = list_skills_with_params()
+        >>> print(schema['web_search']['parameters']['api_key'])
+        {
+            'type': 'string',
+            'description': 'Google Custom Search API key',
+            'required': True,
+            'hidden': True,
+            'env_var': 'GOOGLE_SEARCH_API_KEY'
+        }
+    """
+    from signalwire_agents.skills.registry import skill_registry
+    return skill_registry.get_all_skills_schema()
+
+def register_skill(skill_class):
+    """
+    Register a custom skill class
+    
+    This allows third-party code to register skill classes directly without
+    requiring them to be in a specific directory structure.
+    
+    Args:
+        skill_class: A class that inherits from SkillBase
+        
+    Example:
+        >>> from my_custom_skills import MyWeatherSkill
+        >>> register_skill(MyWeatherSkill)
+        >>> # Now you can use it in agents:
+        >>> agent.add_skill('my_weather')
+    """
+    from signalwire_agents.skills.registry import skill_registry
+    return skill_registry.register_skill(skill_class)
+
+def add_skill_directory(path):
+    """
+    Add a directory to search for skills
+    
+    This allows third-party skill collections to be registered by path.
+    Skills in these directories should follow the same structure as built-in skills.
+    
+    Args:
+        path: Path to directory containing skill subdirectories
+        
+    Example:
+        >>> add_skill_directory('/opt/custom_skills')
+        >>> # Now agent.add_skill('my_custom_skill') will search in this directory
+    """
+    from signalwire_agents.skills.registry import skill_registry
+    return skill_registry.add_skill_directory(path)
+
 __all__ = [
     "AgentBase",
     "AgentServer", 
@@ -78,5 +139,8 @@ __all__ = [
     "create_simple_context",
     "start_agent",
     "run_agent",
-    "list_skills"
+    "list_skills",
+    "list_skills_with_params",
+    "register_skill",
+    "add_skill_directory"
 ]
