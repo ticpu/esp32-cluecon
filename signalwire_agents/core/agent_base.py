@@ -692,6 +692,13 @@ class AgentBase(
         # Add answer verb with auto-answer enabled
         agent_to_use.add_verb("answer", {})
         
+        # Add recording if enabled
+        if agent_to_use._record_call:
+            agent_to_use.add_verb("record_call", {
+                "format": agent_to_use._record_format,
+                "stereo": agent_to_use._record_stereo
+            })
+        
         # Use the AI verb handler to build and validate the AI verb config
         ai_config = {}
         
@@ -811,6 +818,14 @@ class AgentBase(
             # Clear and rebuild the document with the modified AI config
             agent_to_use.reset_document()
             agent_to_use.add_verb("answer", {})
+            
+            # Add recording if enabled
+            if agent_to_use._record_call:
+                agent_to_use.add_verb("record_call", {
+                    "format": agent_to_use._record_format,
+                    "stereo": agent_to_use._record_stereo
+                })
+            
             agent_to_use.add_verb("ai", ai_config)
         
         # Return the rendered document as a string
