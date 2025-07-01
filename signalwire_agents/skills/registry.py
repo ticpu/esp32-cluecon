@@ -12,7 +12,7 @@ import importlib
 import importlib.util
 import inspect
 import sys
-from typing import Dict, List, Type, Optional
+from typing import Dict, List, Type, Optional, Any
 from pathlib import Path
 
 from signalwire_agents.core.skill_base import SkillBase
