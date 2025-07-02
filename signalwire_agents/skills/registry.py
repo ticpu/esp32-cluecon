@@ -128,6 +128,42 @@ class SkillRegistry:
         if not hasattr(skill_class, 'SKILL_NAME') or skill_class.SKILL_NAME is None:
             raise ValueError(f"{skill_class} must define SKILL_NAME")
             
+        # Validate that the skill has a proper parameter schema
+        if not hasattr(skill_class, 'get_parameter_schema') or not callable(getattr(skill_class, 'get_parameter_schema')):
+            raise ValueError(f"{skill_class.__name__} must have get_parameter_schema() classmethod")
+        
+        # Try to call get_parameter_schema to ensure it's properly implemented
+        try:
+            schema = skill_class.get_parameter_schema()
+            if not isinstance(schema, dict):
+                raise ValueError(f"{skill_class.__name__}.get_parameter_schema() must return a dictionary, got {type(schema)}")
+            
+            # Ensure it's not an empty schema (skills should at least have the base parameters)
+            if not schema:
+                raise ValueError(f"{skill_class.__name__}.get_parameter_schema() returned an empty dictionary. Skills should at least call super().get_parameter_schema()")
+            
+            # Check if the skill has overridden the method (not just inherited base)
+            skill_method = getattr(skill_class, 'get_parameter_schema', None)
+            base_method = getattr(SkillBase, 'get_parameter_schema', None)
+            
+            if skill_method and base_method:
+                # For class methods, check the underlying function
+                skill_func = skill_method.__func__ if hasattr(skill_method, '__func__') else skill_method
+                base_func = base_method.__func__ if hasattr(base_method, '__func__') else base_method
+                
+                if skill_func is base_func:
+                    # Get base schema to check if skill added any parameters
+                    base_schema = SkillBase.get_parameter_schema()
+                    if set(schema.keys()) == set(base_schema.keys()):
+                        raise ValueError(f"{skill_class.__name__} must override get_parameter_schema() to define its specific parameters")
+                
+        except AttributeError as e:
+            raise ValueError(f"{skill_class.__name__} must properly implement get_parameter_schema() classmethod")
+        except ValueError:
+            raise  # Re-raise our validation errors
+        except Exception as e:
+            raise ValueError(f"{skill_class.__name__}.get_parameter_schema() failed: {e}")
+            
         if skill_class.SKILL_NAME in self._skills:
             self.logger.warning(f"Skill '{skill_class.SKILL_NAME}' already registered")
             return

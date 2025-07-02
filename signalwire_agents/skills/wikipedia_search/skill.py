@@ -37,6 +37,28 @@ class WikipediaSearchSkill(SkillBase):
     # Does not support multiple instances
     SUPPORTS_MULTIPLE_INSTANCES = False
     
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """Get parameter schema for Wikipedia search skill"""
+        schema = super().get_parameter_schema()
+        schema.update({
+            "num_results": {
+                "type": "integer",
+                "description": "Maximum number of Wikipedia articles to return",
+                "default": 1,
+                "required": False,
+                "minimum": 1,
+                "maximum": 5
+            },
+            "no_results_message": {
+                "type": "string",
+                "description": "Custom message when no Wikipedia articles are found",
+                "default": "I couldn't find any Wikipedia articles for '{query}'. Try rephrasing your search or using different keywords.",
+                "required": False
+            }
+        })
+        return schema
+    
     def setup(self) -> bool:
         """
         Setup the Wikipedia search skill.

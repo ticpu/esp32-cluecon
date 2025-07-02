@@ -44,6 +44,34 @@ class WeatherApiSkill(SkillBase):
     SUPPORTS_MULTIPLE_INSTANCES = False
     REQUIRED_ENV_VARS = []  # API key can be passed via params
     
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """Get parameter schema for weather API skill"""
+        schema = super().get_parameter_schema()
+        schema.update({
+            "api_key": {
+                "type": "string",
+                "description": "WeatherAPI.com API key",
+                "required": True,
+                "hidden": True,
+                "env_var": "WEATHER_API_KEY"
+            },
+            "tool_name": {
+                "type": "string",
+                "description": "Custom name for the weather tool",
+                "default": "get_weather",
+                "required": False
+            },
+            "temperature_unit": {
+                "type": "string",
+                "description": "Temperature unit to display",
+                "default": "fahrenheit",
+                "required": False,
+                "enum": ["fahrenheit", "celsius"]
+            }
+        })
+        return schema
+    
     def __init__(self, agent, params: Dict[str, Any] = None):
         """
         Initialize the skill with configuration parameters.

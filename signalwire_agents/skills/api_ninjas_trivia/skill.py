@@ -198,4 +198,40 @@ class ApiNinjasTriviaSkill(SkillBase):
             }
         }
         
-        return [tool] 
+        return [tool]
+    
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """
+        Get the parameter schema for the API Ninjas Trivia skill.
+        
+        Returns parameter definitions for GUI configuration.
+        """
+        schema = super().get_parameter_schema()
+        
+        # Build categories enum description
+        category_options = []
+        for key, desc in cls.VALID_CATEGORIES.items():
+            category_options.append(f"{key} ({desc})")
+        
+        schema.update({
+            "api_key": {
+                "type": "string",
+                "description": "API Ninjas API key",
+                "required": True,
+                "hidden": True,
+                "env_var": "API_NINJAS_KEY"
+            },
+            "categories": {
+                "type": "array",
+                "description": "List of trivia categories to enable. Available: " + ", ".join(category_options),
+                "default": list(cls.VALID_CATEGORIES.keys()),
+                "required": False,
+                "items": {
+                    "type": "string",
+                    "enum": list(cls.VALID_CATEGORIES.keys())
+                }
+            }
+        })
+        
+        return schema 

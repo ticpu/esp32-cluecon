@@ -23,6 +23,27 @@ class JokeSkill(SkillBase):
     REQUIRED_PACKAGES = []  # DataMap doesn't require local packages
     REQUIRED_ENV_VARS = []  # API key comes from parameters
     
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """Get parameter schema for joke skill"""
+        schema = super().get_parameter_schema()
+        schema.update({
+            "api_key": {
+                "type": "string",
+                "description": "API Ninjas API key for joke service",
+                "required": True,
+                "hidden": True,
+                "env_var": "API_NINJAS_KEY"
+            },
+            "tool_name": {
+                "type": "string",
+                "description": "Custom name for the joke tool",
+                "default": "get_joke",
+                "required": False
+            }
+        })
+        return schema
+        
     def setup(self) -> bool:
         """Setup the joke skill"""
         # Validate required parameters

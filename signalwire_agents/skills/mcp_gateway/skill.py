@@ -33,6 +33,88 @@ class MCPGatewaySkill(SkillBase):
     REQUIRED_PACKAGES = ["requests"]
     REQUIRED_ENV_VARS = []
     
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """Get parameter schema for MCP Gateway skill"""
+        schema = super().get_parameter_schema()
+        schema.update({
+            "gateway_url": {
+                "type": "string",
+                "description": "URL of the MCP Gateway service",
+                "required": True
+            },
+            "auth_token": {
+                "type": "string",
+                "description": "Bearer token for authentication (alternative to basic auth)",
+                "required": False,
+                "hidden": True,
+                "env_var": "MCP_GATEWAY_AUTH_TOKEN"
+            },
+            "auth_user": {
+                "type": "string",
+                "description": "Username for basic authentication (required if auth_token not provided)",
+                "required": False,
+                "env_var": "MCP_GATEWAY_AUTH_USER"
+            },
+            "auth_password": {
+                "type": "string",
+                "description": "Password for basic authentication (required if auth_token not provided)",
+                "required": False,
+                "hidden": True,
+                "env_var": "MCP_GATEWAY_AUTH_PASSWORD"
+            },
+            "services": {
+                "type": "array",
+                "description": "List of MCP services to connect to (empty for all available)",
+                "default": [],
+                "required": False,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Service name"
+                        },
+                        "tools": {
+                            "type": ["string", "array"],
+                            "description": "Tools to expose ('*' for all, or list of tool names)"
+                        }
+                    }
+                }
+            },
+            "session_timeout": {
+                "type": "integer",
+                "description": "Session timeout in seconds",
+                "default": 300,
+                "required": False
+            },
+            "tool_prefix": {
+                "type": "string",
+                "description": "Prefix for registered SWAIG function names",
+                "default": "mcp_",
+                "required": False
+            },
+            "retry_attempts": {
+                "type": "integer",
+                "description": "Number of retry attempts for failed requests",
+                "default": 3,
+                "required": False
+            },
+            "request_timeout": {
+                "type": "integer",
+                "description": "Request timeout in seconds",
+                "default": 30,
+                "required": False
+            },
+            "verify_ssl": {
+                "type": "boolean",
+                "description": "Verify SSL certificates",
+                "default": True,
+                "required": False
+            }
+        })
+        return schema
+    
     def setup(self) -> bool:
         """Setup and validate skill configuration"""
         # Check for auth method - either token or basic auth

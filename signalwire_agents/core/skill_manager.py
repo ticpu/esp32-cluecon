@@ -45,7 +45,53 @@ class SkillManager:
                 self.logger.error(error_msg)
                 return False, error_msg
         
+        # Validate that the skill has a proper parameter schema
+        if not hasattr(skill_class, 'get_parameter_schema') or not callable(getattr(skill_class, 'get_parameter_schema')):
+            error_msg = f"Skill '{skill_name}' must have get_parameter_schema() classmethod"
+            self.logger.error(error_msg)
+            return False, error_msg
+        
         try:
+            # Validate the parameter schema
+            schema = skill_class.get_parameter_schema()
+            if not isinstance(schema, dict):
+                error_msg = f"Skill '{skill_name}'.get_parameter_schema() must return a dictionary"
+                self.logger.error(error_msg)
+                return False, error_msg
+                
+            # Ensure it's not an empty schema
+            if not schema:
+                error_msg = f"Skill '{skill_name}'.get_parameter_schema() returned empty dictionary"
+                self.logger.error(error_msg)
+                return False, error_msg
+            
+            # Check if the skill has overridden the method
+            from signalwire_agents.core.skill_base import SkillBase
+            skill_method = getattr(skill_class, 'get_parameter_schema', None)
+            base_method = getattr(SkillBase, 'get_parameter_schema', None)
+            
+            if skill_method and base_method:
+                # For class methods, check the underlying function
+                skill_func = skill_method.__func__ if hasattr(skill_method, '__func__') else skill_method
+                base_func = base_method.__func__ if hasattr(base_method, '__func__') else base_method
+                
+                if skill_func is base_func:
+                    # Get base schema to check if skill added any parameters
+                    base_schema = SkillBase.get_parameter_schema()
+                    if set(schema.keys()) == set(base_schema.keys()):
+                        error_msg = f"Skill '{skill_name}' must override get_parameter_schema() to define its specific parameters"
+                        self.logger.error(error_msg)
+                        return False, error_msg
+                
+        except AttributeError as e:
+            error_msg = f"Skill '{skill_name}' must properly implement get_parameter_schema() classmethod"
+            self.logger.error(error_msg)
+            return False, error_msg
+        except Exception as e:
+            error_msg = f"Skill '{skill_name}'.get_parameter_schema() failed: {e}"
+            self.logger.error(error_msg)
+            return False, error_msg
+            
             # Create skill instance with parameters to get the instance key
             skill_instance = skill_class(self.agent, params)
             instance_key = skill_instance.get_instance_key()
