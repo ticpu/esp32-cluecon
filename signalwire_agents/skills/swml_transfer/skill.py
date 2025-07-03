@@ -27,6 +27,96 @@ class SWMLTransferSkill(SkillBase):
     # Enable multiple instances support
     SUPPORTS_MULTIPLE_INSTANCES = True
     
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """Get parameter schema for SWML Transfer skill"""
+        schema = super().get_parameter_schema()
+        schema.update({
+            "transfers": {
+                "type": "object",
+                "description": "Transfer configurations mapping patterns to destinations",
+                "required": True,
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "SWML endpoint URL for agent transfer"
+                        },
+                        "address": {
+                            "type": "string", 
+                            "description": "Phone number or SIP address for direct connect"
+                        },
+                        "message": {
+                            "type": "string",
+                            "description": "Message to say before transferring",
+                            "default": "Transferring you now..."
+                        },
+                        "return_message": {
+                            "type": "string",
+                            "description": "Message when returning from transfer",
+                            "default": "The transfer is complete. How else can I help you?"
+                        },
+                        "post_process": {
+                            "type": "boolean",
+                            "description": "Whether to process message with AI before saying",
+                            "default": True
+                        },
+                        "final": {
+                            "type": "boolean",
+                            "description": "Whether transfer is permanent (true) or temporary (false)",
+                            "default": True
+                        },
+                        "from_addr": {
+                            "type": "string",
+                            "description": "Caller ID for connect action (optional)"
+                        }
+                    }
+                }
+            },
+            "description": {
+                "type": "string",
+                "description": "Description for the transfer tool",
+                "default": "Transfer call based on pattern matching",
+                "required": False
+            },
+            "parameter_name": {
+                "type": "string",
+                "description": "Name of the parameter that accepts the transfer type",
+                "default": "transfer_type",
+                "required": False
+            },
+            "parameter_description": {
+                "type": "string",
+                "description": "Description for the transfer type parameter",
+                "default": "The type of transfer to perform",
+                "required": False
+            },
+            "default_message": {
+                "type": "string",
+                "description": "Message when no pattern matches",
+                "default": "Please specify a valid transfer type.",
+                "required": False
+            },
+            "default_post_process": {
+                "type": "boolean",
+                "description": "Whether to process default message with AI",
+                "default": False,
+                "required": False
+            },
+            "required_fields": {
+                "type": "object",
+                "description": "Additional required fields to collect before transfer",
+                "default": {},
+                "required": False,
+                "additionalProperties": {
+                    "type": "string",
+                    "description": "Field description"
+                }
+            }
+        })
+        return schema
+    
     def get_instance_key(self) -> str:
         """
         Get the key used to track this skill instance

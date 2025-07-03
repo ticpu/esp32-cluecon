@@ -33,6 +33,119 @@ class SpiderSkill(SkillBase):
     # Compiled regex for performance
     WHITESPACE_REGEX = re.compile(r'\s+')
     
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """Get parameter schema for Spider skill"""
+        schema = super().get_parameter_schema()
+        schema.update({
+            "delay": {
+                "type": "number",
+                "description": "Delay between requests in seconds",
+                "default": 0.1,
+                "required": False,
+                "minimum": 0.0
+            },
+            "concurrent_requests": {
+                "type": "integer",
+                "description": "Number of concurrent requests allowed",
+                "default": 5,
+                "required": False,
+                "minimum": 1,
+                "maximum": 20
+            },
+            "timeout": {
+                "type": "integer",
+                "description": "Request timeout in seconds",
+                "default": 5,
+                "required": False,
+                "minimum": 1,
+                "maximum": 60
+            },
+            "max_pages": {
+                "type": "integer",
+                "description": "Maximum number of pages to scrape",
+                "default": 1,
+                "required": False,
+                "minimum": 1,
+                "maximum": 100
+            },
+            "max_depth": {
+                "type": "integer",
+                "description": "Maximum crawl depth (0 = single page only)",
+                "default": 0,
+                "required": False,
+                "minimum": 0,
+                "maximum": 5
+            },
+            "extract_type": {
+                "type": "string",
+                "description": "Content extraction method",
+                "default": "fast_text",
+                "required": False,
+                "enum": ["fast_text", "clean_text", "full_text", "html", "custom"]
+            },
+            "max_text_length": {
+                "type": "integer",
+                "description": "Maximum text length to return",
+                "default": 10000,
+                "required": False,
+                "minimum": 100,
+                "maximum": 100000
+            },
+            "clean_text": {
+                "type": "boolean",
+                "description": "Whether to clean extracted text",
+                "default": True,
+                "required": False
+            },
+            "selectors": {
+                "type": "object",
+                "description": "Custom CSS/XPath selectors for extraction",
+                "default": {},
+                "required": False,
+                "additionalProperties": {
+                    "type": "string"
+                }
+            },
+            "follow_patterns": {
+                "type": "array",
+                "description": "URL patterns to follow when crawling",
+                "default": [],
+                "required": False,
+                "items": {
+                    "type": "string"
+                }
+            },
+            "user_agent": {
+                "type": "string",
+                "description": "User agent string for requests",
+                "default": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "required": False
+            },
+            "headers": {
+                "type": "object",
+                "description": "Additional HTTP headers",
+                "default": {},
+                "required": False,
+                "additionalProperties": {
+                    "type": "string"
+                }
+            },
+            "follow_robots_txt": {
+                "type": "boolean",
+                "description": "Whether to respect robots.txt",
+                "default": True,
+                "required": False
+            },
+            "cache_enabled": {
+                "type": "boolean",
+                "description": "Whether to cache scraped pages",
+                "default": True,
+                "required": False
+            }
+        })
+        return schema
+    
     def __init__(self, agent, params: Dict[str, Any]):
         """Initialize the spider skill with configuration parameters."""
         super().__init__(agent, params)

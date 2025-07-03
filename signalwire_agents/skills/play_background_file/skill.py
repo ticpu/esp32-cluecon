@@ -48,6 +48,42 @@ class PlayBackgroundFileSkill(SkillBase):
     SKILL_DESCRIPTION = "Control background file playback"
     SUPPORTS_MULTIPLE_INSTANCES = True
     
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """Get parameter schema for Play Background File skill"""
+        schema = super().get_parameter_schema()
+        schema.update({
+            "files": {
+                "type": "array",
+                "description": "Array of file configurations to make available for playback",
+                "required": True,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "key": {
+                            "type": "string",
+                            "description": "Unique identifier for the file"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Human-readable description of the file"
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": "URL of the audio/video file to play"
+                        },
+                        "wait": {
+                            "type": "boolean",
+                            "description": "Whether to wait for file to finish playing",
+                            "default": False
+                        }
+                    },
+                    "required": ["key", "description", "url"]
+                }
+            }
+        })
+        return schema
+    
     def __init__(self, agent, params: Dict[str, Any] = None):
         """
         Initialize the skill with configuration parameters.

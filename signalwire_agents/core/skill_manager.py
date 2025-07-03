@@ -91,7 +91,8 @@ class SkillManager:
             error_msg = f"Skill '{skill_name}'.get_parameter_schema() failed: {e}"
             self.logger.error(error_msg)
             return False, error_msg
-            
+        
+        try:
             # Create skill instance with parameters to get the instance key
             skill_instance = skill_class(self.agent, params)
             instance_key = skill_instance.get_instance_key()

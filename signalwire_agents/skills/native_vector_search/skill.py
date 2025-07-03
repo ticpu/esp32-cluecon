@@ -28,6 +28,151 @@ class NativeVectorSearchSkill(SkillBase):
     # Enable multiple instances support
     SUPPORTS_MULTIPLE_INSTANCES = True
     
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """Get parameter schema for Native Vector Search skill"""
+        schema = super().get_parameter_schema()
+        schema.update({
+            "index_file": {
+                "type": "string",
+                "description": "Path to .swsearch index file",
+                "required": False
+            },
+            "build_index": {
+                "type": "boolean",
+                "description": "Whether to build index from source files",
+                "default": False,
+                "required": False
+            },
+            "source_dir": {
+                "type": "string",
+                "description": "Directory containing documents to index (required if build_index=True)",
+                "required": False
+            },
+            "remote_url": {
+                "type": "string",
+                "description": "URL of remote search server (e.g., http://localhost:8001)",
+                "required": False
+            },
+            "index_name": {
+                "type": "string",
+                "description": "Name of index for remote searches",
+                "default": "default",
+                "required": False
+            },
+            "count": {
+                "type": "integer",
+                "description": "Number of search results to return",
+                "default": 5,
+                "required": False,
+                "minimum": 1,
+                "maximum": 20
+            },
+            "distance_threshold": {
+                "type": "number",
+                "description": "Maximum distance threshold for results (0.0 = no limit)",
+                "default": 0.0,
+                "required": False,
+                "minimum": 0.0,
+                "maximum": 1.0
+            },
+            "tags": {
+                "type": "array",
+                "description": "Tags to filter search results",
+                "default": [],
+                "required": False,
+                "items": {
+                    "type": "string"
+                }
+            },
+            "global_tags": {
+                "type": "array",
+                "description": "Tags to apply to all indexed documents",
+                "default": [],
+                "required": False,
+                "items": {
+                    "type": "string"
+                }
+            },
+            "file_types": {
+                "type": "array",
+                "description": "File extensions to include when building index",
+                "default": ["md", "txt", "pdf", "docx", "html"],
+                "required": False,
+                "items": {
+                    "type": "string"
+                }
+            },
+            "exclude_patterns": {
+                "type": "array",
+                "description": "Patterns to exclude when building index",
+                "default": ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**"],
+                "required": False,
+                "items": {
+                    "type": "string"
+                }
+            },
+            "no_results_message": {
+                "type": "string",
+                "description": "Message when no results are found",
+                "default": "No information found for '{query}'",
+                "required": False
+            },
+            "response_prefix": {
+                "type": "string",
+                "description": "Prefix to add to search results",
+                "default": "",
+                "required": False
+            },
+            "response_postfix": {
+                "type": "string",
+                "description": "Postfix to add to search results",
+                "default": "",
+                "required": False
+            },
+            "description": {
+                "type": "string",
+                "description": "Tool description",
+                "default": "Search the knowledge base for information",
+                "required": False
+            },
+            "hints": {
+                "type": "array",
+                "description": "Speech recognition hints",
+                "default": [],
+                "required": False,
+                "items": {
+                    "type": "string"
+                }
+            },
+            "nlp_backend": {
+                "type": "string",
+                "description": "NLP backend for query processing",
+                "default": "basic",
+                "required": False,
+                "enum": ["basic", "spacy", "nltk"]
+            },
+            "query_nlp_backend": {
+                "type": "string",
+                "description": "NLP backend for query expansion",
+                "required": False,
+                "enum": ["basic", "spacy", "nltk"]
+            },
+            "index_nlp_backend": {
+                "type": "string",
+                "description": "NLP backend for indexing",
+                "required": False,
+                "enum": ["basic", "spacy", "nltk"]
+            },
+            "verbose": {
+                "type": "boolean",
+                "description": "Enable verbose logging",
+                "default": False,
+                "required": False
+            }
+        })
+        return schema
+    
     def get_instance_key(self) -> str:
         """
         Get the key used to track this skill instance

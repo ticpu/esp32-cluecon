@@ -26,6 +26,88 @@ class DataSphereSkill(SkillBase):
     # Enable multiple instances support
     SUPPORTS_MULTIPLE_INSTANCES = True
     
+    @classmethod
+    def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """Get parameter schema for DataSphere skill"""
+        schema = super().get_parameter_schema()
+        schema.update({
+            "space_name": {
+                "type": "string",
+                "description": "SignalWire space name (e.g., 'mycompany' from mycompany.signalwire.com)",
+                "required": True
+            },
+            "project_id": {
+                "type": "string",
+                "description": "SignalWire project ID",
+                "required": True,
+                "env_var": "SIGNALWIRE_PROJECT_ID"
+            },
+            "token": {
+                "type": "string",
+                "description": "SignalWire API token",
+                "required": True,
+                "hidden": True,
+                "env_var": "SIGNALWIRE_TOKEN"
+            },
+            "document_id": {
+                "type": "string",
+                "description": "DataSphere document ID to search within",
+                "required": True
+            },
+            "count": {
+                "type": "integer",
+                "description": "Number of search results to return",
+                "default": 1,
+                "required": False,
+                "minimum": 1,
+                "maximum": 10
+            },
+            "distance": {
+                "type": "number",
+                "description": "Maximum distance threshold for results (lower is more relevant)",
+                "default": 3.0,
+                "required": False,
+                "minimum": 0.0,
+                "maximum": 10.0
+            },
+            "tags": {
+                "type": "array",
+                "description": "Tags to filter search results",
+                "required": False,
+                "items": {
+                    "type": "string"
+                }
+            },
+            "language": {
+                "type": "string",
+                "description": "Language code for query expansion (e.g., 'en', 'es')",
+                "required": False
+            },
+            "pos_to_expand": {
+                "type": "array",
+                "description": "Parts of speech to expand with synonyms",
+                "required": False,
+                "items": {
+                    "type": "string",
+                    "enum": ["NOUN", "VERB", "ADJ", "ADV"]
+                }
+            },
+            "max_synonyms": {
+                "type": "integer",
+                "description": "Maximum number of synonyms to use for query expansion",
+                "required": False,
+                "minimum": 1,
+                "maximum": 10
+            },
+            "no_results_message": {
+                "type": "string",
+                "description": "Message to return when no results are found",
+                "default": "I couldn't find any relevant information for '{query}' in the knowledge base. Try rephrasing your question or asking about a different topic.",
+                "required": False
+            }
+        })
+        return schema
+    
     def get_instance_key(self) -> str:
         """
         Get the key used to track this skill instance
