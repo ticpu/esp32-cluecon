@@ -376,7 +376,7 @@ class AIConfigMixin:
         self,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
-        confidence: Optional[float] = None,
+        barge_confidence: Optional[float] = None,
         presence_penalty: Optional[float] = None,
         frequency_penalty: Optional[float] = None
     ) -> 'AgentBase':
@@ -388,8 +388,8 @@ class AIConfigMixin:
                         Default: 0.3
             top_p: Alternative to temperature (0.0-1.0). Controls nucleus sampling.
                    Default: 1.0
-            confidence: Speech detection threshold (0.0-1.0). Lower values reduce pause after user speaks.
-                       Default: 0.75
+            barge_confidence: ASR confidence to interrupt (0.0-1.0). Higher values make it harder to interrupt.
+                             Default: 0.0
             presence_penalty: Topic diversity (-2.0 to 2.0). Positive values encourage new topics.
                              Default: 0.1
             frequency_penalty: Repetition control (-2.0 to 2.0). Positive values reduce repetition.
@@ -402,13 +402,9 @@ class AIConfigMixin:
             agent.set_prompt_llm_params(
                 temperature=0.7,
                 top_p=0.9,
-                confidence=0.6
+                barge_confidence=0.6
             )
         """
-        # Initialize prompt LLM params if not exists
-        if not hasattr(self, '_prompt_llm_params'):
-            self._prompt_llm_params = {}
-        
         # Validate and set temperature
         if temperature is not None:
             if not 0.0 <= temperature <= 1.5:
@@ -421,11 +417,11 @@ class AIConfigMixin:
                 raise ValueError("top_p must be between 0.0 and 1.0")
             self._prompt_llm_params['top_p'] = top_p
         
-        # Validate and set confidence
-        if confidence is not None:
-            if not 0.0 <= confidence <= 1.0:
-                raise ValueError("confidence must be between 0.0 and 1.0")
-            self._prompt_llm_params['confidence'] = confidence
+        # Validate and set barge_confidence
+        if barge_confidence is not None:
+            if not 0.0 <= barge_confidence <= 1.0:
+                raise ValueError("barge_confidence must be between 0.0 and 1.0")
+            self._prompt_llm_params['barge_confidence'] = barge_confidence
         
         # Validate and set presence_penalty
         if presence_penalty is not None:
@@ -445,7 +441,6 @@ class AIConfigMixin:
         self,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
-        confidence: Optional[float] = None,
         presence_penalty: Optional[float] = None,
         frequency_penalty: Optional[float] = None
     ) -> 'AgentBase':
@@ -457,8 +452,6 @@ class AIConfigMixin:
                         Default: 0.0
             top_p: Alternative to temperature (0.0-1.0). Controls nucleus sampling.
                    Default: 1.0
-            confidence: Speech detection threshold (0.0-1.0). Lower values reduce pause after user speaks.
-                       Default: 0.75
             presence_penalty: Topic diversity (-2.0 to 2.0). Positive values encourage new topics.
                              Default: 0.0
             frequency_penalty: Repetition control (-2.0 to 2.0). Positive values reduce repetition.
@@ -470,13 +463,9 @@ class AIConfigMixin:
         Example:
             agent.set_post_prompt_llm_params(
                 temperature=0.5,  # More deterministic for post-prompt
-                confidence=0.7
+                top_p=0.9
             )
         """
-        # Initialize post prompt LLM params if not exists
-        if not hasattr(self, '_post_prompt_llm_params'):
-            self._post_prompt_llm_params = {}
-        
         # Validate and set temperature
         if temperature is not None:
             if not 0.0 <= temperature <= 1.5:
@@ -488,12 +477,6 @@ class AIConfigMixin:
             if not 0.0 <= top_p <= 1.0:
                 raise ValueError("top_p must be between 0.0 and 1.0")
             self._post_prompt_llm_params['top_p'] = top_p
-        
-        # Validate and set confidence
-        if confidence is not None:
-            if not 0.0 <= confidence <= 1.0:
-                raise ValueError("confidence must be between 0.0 and 1.0")
-            self._post_prompt_llm_params['confidence'] = confidence
         
         # Validate and set presence_penalty
         if presence_penalty is not None:

@@ -1129,9 +1129,9 @@ The SDK provides methods to fine-tune the Language Model parameters for both the
 ```python
 # Set LLM parameters for the main prompt
 self.set_prompt_llm_params(
-    temperature=0.7,        # Controls randomness (0.0-1.0)
+    temperature=0.7,        # Controls randomness (0.0-1.5)
     top_p=0.9,             # Nucleus sampling threshold
-    confidence=0.6,        # Minimum confidence for responses
+    barge_confidence=0.6,  # ASR confidence to interrupt
     presence_penalty=0.0,  # Penalizes token repetition
     frequency_penalty=0.0  # Penalizes frequent word usage
 )
@@ -1139,7 +1139,7 @@ self.set_prompt_llm_params(
 # Set different parameters for the post-prompt
 self.set_post_prompt_llm_params(
     temperature=0.3,       # Lower temperature for consistent summaries
-    confidence=0.8        # Higher confidence for summaries
+    top_p=0.95            # Slightly wider token selection
 )
 ```
 

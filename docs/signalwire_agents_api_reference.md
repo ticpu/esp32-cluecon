@@ -147,7 +147,7 @@ Set Language Model parameters for the main prompt.
 **Parameters:**
 - `temperature` (Optional[float]): Controls randomness (0.0-1.5). Lower = more focused. Default: 0.3
 - `top_p` (Optional[float]): Nucleus sampling threshold (0.0-1.0). Default: 1.0
-- `confidence` (Optional[float]): Speech detection threshold (0.0-1.0). Default: 0.75
+- `barge_confidence` (Optional[float]): ASR confidence to interrupt (0.0-1.0). Default: 0.0
 - `presence_penalty` (Optional[float]): Topic diversity (-2.0-2.0). Default: 0.1
 - `frequency_penalty` (Optional[float]): Repetition control (-2.0-2.0). Default: 0.1
 
@@ -157,7 +157,7 @@ Set Language Model parameters for the main prompt.
 agent.set_prompt_llm_params(
     temperature=0.3,
     top_p=0.9,
-    confidence=0.7,
+    barge_confidence=0.7,
     presence_penalty=0.1,
     frequency_penalty=0.2
 )
@@ -169,7 +169,6 @@ agent.set_prompt_llm_params(
 def set_post_prompt_llm_params(
     temperature: Optional[float] = None,
     top_p: Optional[float] = None,
-    confidence: Optional[float] = None,
     presence_penalty: Optional[float] = None,
     frequency_penalty: Optional[float] = None
 ) -> AgentBase
@@ -177,14 +176,19 @@ def set_post_prompt_llm_params(
 Set Language Model parameters for the post-prompt.
 
 **Parameters:**
-- Same as `set_prompt_llm_params`
+- `temperature` (Optional[float]): Controls randomness (0.0-1.5). Default: 0.0
+- `top_p` (Optional[float]): Nucleus sampling threshold (0.0-1.0). Default: 1.0
+- `presence_penalty` (Optional[float]): Topic diversity (-2.0-2.0). Default: 0.0
+- `frequency_penalty` (Optional[float]): Repetition control (-2.0-2.0). Default: 0.0
+
+Note: barge_confidence is not available for post-prompt.
 
 **Usage:**
 ```python
 # Configure for focused summaries
 agent.set_post_prompt_llm_params(
     temperature=0.2,
-    confidence=0.8
+    top_p=0.9
 )
 ```
 

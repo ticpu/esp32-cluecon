@@ -128,6 +128,17 @@ class SimpleAgent(AgentBase):
             "Use the get_time function when asked about the current time.",
             "Use the get_weather function when asked about the weather."
         ])
+
+
+        self.set_prompt_llm_params(
+            temperature=0.3,        # Low temperature for more consistent responses
+            top_p=0.9,             # Slightly reduced for focused responses
+            barge_confidence=0.7,        # Higher confidence threshold
+            presence_penalty=0.1,  # Slight penalty for repetition
+            frequency_penalty=0.2  # Encourage varied vocabulary
+        )
+
+        
         
         # Add a post-prompt for summary generation
         # This is processed after the conversation ends to generate a summary

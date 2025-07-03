@@ -575,7 +575,7 @@ class PreciseAgent(AgentBase):
         self.set_prompt_llm_params(
             temperature=0.3,        # Low temperature for more consistent responses
             top_p=0.9,             # Slightly reduced for focused responses
-            confidence=0.7,        # Higher confidence threshold
+            barge_confidence=0.7,  # Moderate interruption threshold
             presence_penalty=0.1,  # Slight penalty for repetition
             frequency_penalty=0.2  # Encourage varied vocabulary
         )
@@ -586,7 +586,7 @@ class PreciseAgent(AgentBase):
         # Different parameters for post-prompt (summaries should be even more focused)
         self.set_post_prompt_llm_params(
             temperature=0.2,       # Very low for consistent summaries
-            confidence=0.8        # High confidence for summaries
+            top_p=0.85            # More focused token selection
         )
 
 agent = PreciseAgent()
@@ -597,7 +597,7 @@ agent.serve()
 
 - **temperature** (0.0-1.5): Controls randomness. Lower = more focused, higher = more creative
 - **top_p** (0.0-1.0): Nucleus sampling. Lower = more focused on likely tokens
-- **confidence** (0.0-1.0): Speech detection threshold. Lower = shorter pauses
+- **barge_confidence** (0.0-1.0): ASR confidence to interrupt. Higher = harder to interrupt
 - **presence_penalty** (-2.0-2.0): Topic diversity. Positive = new topics
 - **frequency_penalty** (-2.0-2.0): Repetition control. Positive = varied vocabulary
 
