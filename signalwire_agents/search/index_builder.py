@@ -46,7 +46,9 @@ class IndexBuilder:
         index_nlp_backend: str = 'nltk',
         verbose: bool = False,
         semantic_threshold: float = 0.5,
-        topic_threshold: float = 0.3
+        topic_threshold: float = 0.3,
+        backend: str = 'sqlite',
+        connection_string: Optional[str] = None
     ):
         """
         Initialize the index builder
@@ -62,6 +64,8 @@ class IndexBuilder:
             verbose: Whether to enable verbose logging (default: False)
             semantic_threshold: Similarity threshold for semantic chunking (default: 0.5)
             topic_threshold: Similarity threshold for topic chunking (default: 0.3)
+            backend: Storage backend ('sqlite' or 'pgvector') (default: 'sqlite')
+            connection_string: PostgreSQL connection string for pgvector backend
         """
         self.model_name = model_name
         self.chunking_strategy = chunking_strategy
@@ -73,7 +77,16 @@ class IndexBuilder:
         self.verbose = verbose
         self.semantic_threshold = semantic_threshold
         self.topic_threshold = topic_threshold
+        self.backend = backend
+        self.connection_string = connection_string
         self.model = None
+        
+        # Validate backend
+        if self.backend not in ['sqlite', 'pgvector']:
+            raise ValueError(f"Invalid backend '{self.backend}'. Must be 'sqlite' or 'pgvector'")
+        
+        if self.backend == 'pgvector' and not self.connection_string:
+            raise ValueError("connection_string is required for pgvector backend")
         
         # Validate NLP backend
         if self.index_nlp_backend not in ['nltk', 'spacy']:
@@ -109,7 +122,8 @@ class IndexBuilder:
     
     def build_index_from_sources(self, sources: List[Path], output_file: str, 
                                 file_types: List[str], exclude_patterns: Optional[List[str]] = None,
-                                languages: List[str] = None, tags: Optional[List[str]] = None):
+                                languages: List[str] = None, tags: Optional[List[str]] = None,
+                                overwrite: bool = False):
         """
         Build complete search index from multiple sources (files and directories)
         
@@ -191,13 +205,18 @@ class IndexBuilder:
                 else:
                     chunk['embedding'] = b''
         
-        # Create SQLite database
-        sources_info = [str(s) for s in sources]
-        self._create_database(output_file, chunks, languages or ['en'], sources_info, file_types)
-        
-        if self.verbose:
-            print(f"Index created: {output_file}")
-            print(f"Total chunks: {len(chunks)}")
+        # Store chunks based on backend
+        if self.backend == 'sqlite':
+            # Create SQLite database
+            sources_info = [str(s) for s in sources]
+            self._create_database(output_file, chunks, languages or ['en'], sources_info, file_types)
+            
+            if self.verbose:
+                print(f"Index created: {output_file}")
+                print(f"Total chunks: {len(chunks)}")
+        else:
+            # Use pgvector backend
+            self._store_chunks_pgvector(chunks, output_file, languages or ['en'], overwrite)
 
     def build_index(self, source_dir: str, output_file: str, 
                    file_types: List[str], exclude_patterns: Optional[List[str]] = None,
@@ -607,4 +626,80 @@ class IndexBuilder:
             }
             
         except Exception as e:
-            return {"valid": False, "error": str(e)} 
+            return {"valid": False, "error": str(e)}
+    
+    def _store_chunks_pgvector(self, chunks: List[Dict[str, Any]], collection_name: str,
+                              languages: List[str], overwrite: bool = False):
+        """
+        Store chunks in pgvector backend
+        
+        Args:
+            chunks: List of processed chunks
+            collection_name: Name for the collection (from output_file parameter)
+            languages: List of supported languages
+        """
+        from .pgvector_backend import PgVectorBackend
+        
+        # Extract collection name from the provided name
+        if collection_name.endswith('.swsearch'):
+            collection_name = collection_name[:-9]  # Remove .swsearch extension
+        
+        # Clean collection name for PostgreSQL
+        import re
+        collection_name = re.sub(r'[^a-zA-Z0-9_]', '_', collection_name)
+        
+        if self.verbose:
+            print(f"Storing chunks in pgvector collection: {collection_name}")
+        
+        # Create backend instance
+        backend = PgVectorBackend(self.connection_string)
+        
+        try:
+            # Get embedding dimensions from model
+            if self.model:
+                embedding_dim = self.model.get_sentence_embedding_dimension()
+            else:
+                embedding_dim = 768  # Default for all-mpnet-base-v2
+            
+            # Delete existing collection if overwrite is requested
+            if overwrite:
+                if self.verbose:
+                    print(f"Dropping existing collection: {collection_name}")
+                backend.delete_collection(collection_name)
+            
+            # Create schema
+            backend.create_schema(collection_name, embedding_dim)
+            
+            # Convert embeddings from bytes to numpy arrays
+            for chunk in chunks:
+                if chunk.get('embedding') and isinstance(chunk['embedding'], bytes):
+                    if np:
+                        chunk['embedding'] = np.frombuffer(chunk['embedding'], dtype=np.float32)
+                    else:
+                        # If numpy not available, leave as bytes
+                        pass
+            
+            # Prepare config
+            config = {
+                'model_name': self.model_name,
+                'embedding_dimensions': embedding_dim,
+                'chunking_strategy': self.chunking_strategy,
+                'languages': languages,
+                'metadata': {
+                    'max_sentences_per_chunk': self.max_sentences_per_chunk,
+                    'chunk_size': self.chunk_size,
+                    'chunk_overlap': self.chunk_overlap,
+                    'index_nlp_backend': self.index_nlp_backend
+                }
+            }
+            
+            # Store chunks
+            backend.store_chunks(chunks, collection_name, config)
+            
+            if self.verbose:
+                stats = backend.get_stats(collection_name)
+                print(f"Stored {stats['total_chunks']} chunks in pgvector")
+                print(f"Collection: {collection_name}")
+                
+        finally:
+            backend.close() 

@@ -89,6 +89,24 @@ Examples:
   # Search via remote API
   sw-search remote http://localhost:8001 "how to create an agent" --index-name docs
   sw-search remote localhost:8001 "API reference" --index-name docs --count 3 --verbose
+
+  # PostgreSQL pgvector backend
+  sw-search ./docs \\
+    --backend pgvector \\
+    --connection-string "postgresql://user:pass@localhost/knowledge" \\
+    --output docs_collection
+
+  # Overwrite existing pgvector collection
+  sw-search ./docs \\
+    --backend pgvector \\
+    --connection-string "postgresql://user:pass@localhost/knowledge" \\
+    --output docs_collection \\
+    --overwrite
+
+  # Search in pgvector collection
+  sw-search search docs_collection "how to create an agent" \\
+    --backend pgvector \\
+    --connection-string "postgresql://user:pass@localhost/knowledge"
         """
     )
     
@@ -100,7 +118,25 @@ Examples:
     
     parser.add_argument(
         '--output', 
-        help='Output .swsearch file (default: sources.swsearch)'
+        help='Output .swsearch file (default: sources.swsearch) or collection name for pgvector'
+    )
+    
+    parser.add_argument(
+        '--backend',
+        choices=['sqlite', 'pgvector'],
+        default='sqlite',
+        help='Storage backend to use (default: sqlite)'
+    )
+    
+    parser.add_argument(
+        '--connection-string',
+        help='PostgreSQL connection string for pgvector backend'
+    )
+    
+    parser.add_argument(
+        '--overwrite',
+        action='store_true',
+        help='Overwrite existing collection (pgvector backend only)'
     )
     
     parser.add_argument(
@@ -213,18 +249,31 @@ Examples:
         print("Error: No valid sources found")
         sys.exit(1)
     
+    # Validate backend configuration
+    if args.backend == 'pgvector' and not args.connection_string:
+        print("Error: --connection-string is required for pgvector backend")
+        sys.exit(1)
+    
     # Default output filename
     if not args.output:
-        if len(valid_sources) == 1:
-            # Single source - use its name
-            source_name = valid_sources[0].stem if valid_sources[0].is_file() else valid_sources[0].name
-            args.output = f"{source_name}.swsearch"
+        if args.backend == 'sqlite':
+            if len(valid_sources) == 1:
+                # Single source - use its name
+                source_name = valid_sources[0].stem if valid_sources[0].is_file() else valid_sources[0].name
+                args.output = f"{source_name}.swsearch"
+            else:
+                # Multiple sources - use generic name
+                args.output = "sources.swsearch"
         else:
-            # Multiple sources - use generic name
-            args.output = "sources.swsearch"
+            # For pgvector, use a default collection name
+            if len(valid_sources) == 1:
+                source_name = valid_sources[0].stem if valid_sources[0].is_file() else valid_sources[0].name
+                args.output = source_name
+            else:
+                args.output = "documents"
     
-    # Ensure output has .swsearch extension
-    if not args.output.endswith('.swsearch'):
+    # Ensure output has .swsearch extension for sqlite
+    if args.backend == 'sqlite' and not args.output.endswith('.swsearch'):
         args.output += '.swsearch'
     
     # Parse lists
@@ -235,8 +284,13 @@ Examples:
     
     if args.verbose:
         print(f"Building search index:")
+        print(f"  Backend: {args.backend}")
         print(f"  Sources: {[str(s) for s in valid_sources]}")
-        print(f"  Output: {args.output}")
+        if args.backend == 'sqlite':
+            print(f"  Output file: {args.output}")
+        else:
+            print(f"  Collection name: {args.output}")
+            print(f"  Connection: {args.connection_string}")
         print(f"  File types (for directories): {file_types}")
         print(f"  Exclude patterns: {exclude_patterns}")
         print(f"  Languages: {languages}")
@@ -278,7 +332,9 @@ Examples:
             index_nlp_backend=args.index_nlp_backend,
             verbose=args.verbose,
             semantic_threshold=args.semantic_threshold,
-            topic_threshold=args.topic_threshold
+            topic_threshold=args.topic_threshold,
+            backend=args.backend,
+            connection_string=args.connection_string
         )
         
         # Build index with multiple sources
@@ -288,7 +344,8 @@ Examples:
             file_types=file_types,
             exclude_patterns=exclude_patterns,
             languages=languages,
-            tags=tags
+            tags=tags,
+            overwrite=args.overwrite if args.backend == 'pgvector' else False
         )
         
         # Validate if requested
@@ -307,7 +364,11 @@ Examples:
                 print(f"✗ Index validation failed: {validation['error']}")
                 sys.exit(1)
         
-        print(f"\n✓ Search index created successfully: {args.output}")
+        if args.backend == 'sqlite':
+            print(f"\n✓ Search index created successfully: {args.output}")
+        else:
+            print(f"\n✓ Search collection created successfully: {args.output}")
+            print(f"   Connection: {args.connection_string}")
         
     except KeyboardInterrupt:
         print("\n\nBuild interrupted by user")
@@ -359,9 +420,12 @@ def validate_command():
 
 def search_command():
     """Search within an existing search index"""
-    parser = argparse.ArgumentParser(description='Search within a .swsearch index file')
-    parser.add_argument('index_file', help='Path to .swsearch file to search')
+    parser = argparse.ArgumentParser(description='Search within a .swsearch index file or pgvector collection')
+    parser.add_argument('index_source', help='Path to .swsearch file or collection name for pgvector')
     parser.add_argument('query', help='Search query')
+    parser.add_argument('--backend', choices=['sqlite', 'pgvector'], default='sqlite',
+                       help='Storage backend (default: sqlite)')
+    parser.add_argument('--connection-string', help='PostgreSQL connection string for pgvector backend')
     parser.add_argument('--count', type=int, default=5, help='Number of results to return (default: 5)')
     parser.add_argument('--distance-threshold', type=float, default=0.0, help='Minimum similarity score (default: 0.0)')
     parser.add_argument('--tags', help='Comma-separated tags to filter by')
@@ -373,8 +437,13 @@ def search_command():
     
     args = parser.parse_args()
     
-    if not Path(args.index_file).exists():
-        print(f"Error: Index file does not exist: {args.index_file}")
+    # Validate backend configuration
+    if args.backend == 'pgvector' and not args.connection_string:
+        print("Error: --connection-string is required for pgvector backend")
+        sys.exit(1)
+    
+    if args.backend == 'sqlite' and not Path(args.index_source).exists():
+        print(f"Error: Index file does not exist: {args.index_source}")
         sys.exit(1)
     
     try:
@@ -389,9 +458,16 @@ def search_command():
         
         # Load search engine
         if args.verbose:
-            print(f"Loading search index: {args.index_file}")
+            if args.backend == 'sqlite':
+                print(f"Loading search index: {args.index_source}")
+            else:
+                print(f"Connecting to pgvector collection: {args.index_source}")
         
-        engine = SearchEngine(args.index_file)
+        if args.backend == 'sqlite':
+            engine = SearchEngine(backend='sqlite', index_path=args.index_source)
+        else:
+            engine = SearchEngine(backend='pgvector', connection_string=args.connection_string,
+                                collection_name=args.index_source)
         
         # Get index stats
         stats = engine.get_stats()

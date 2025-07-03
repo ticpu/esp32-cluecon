@@ -30,12 +30,18 @@ class NativeVectorSearchSkill(SkillBase):
     
     @classmethod
     def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
-        """Get parameter schema for Native Vector Search skill"""
+        """Get parameter schema for Native Vector Search skill
+        
+        This skill supports three modes of operation:
+        1. Network Mode: Set 'remote_url' to connect to a remote search server
+        2. Local pgvector: Set backend='pgvector' with connection_string and collection_name
+        3. Local SQLite: Set 'index_file' to use a local .swsearch file (default)
+        """
         schema = super().get_parameter_schema()
         schema.update({
             "index_file": {
                 "type": "string",
-                "description": "Path to .swsearch index file",
+                "description": "Path to .swsearch index file (SQLite backend only). Use this for local file-based search",
                 "required": False
             },
             "build_index": {
@@ -51,12 +57,12 @@ class NativeVectorSearchSkill(SkillBase):
             },
             "remote_url": {
                 "type": "string",
-                "description": "URL of remote search server (e.g., http://localhost:8001)",
+                "description": "URL of remote search server for network mode (e.g., http://localhost:8001). Use this instead of index_file or pgvector for centralized search",
                 "required": False
             },
             "index_name": {
                 "type": "string",
-                "description": "Name of index for remote searches",
+                "description": "Name of index on remote server (network mode only, used with remote_url)",
                 "default": "default",
                 "required": False
             },
@@ -164,6 +170,23 @@ class NativeVectorSearchSkill(SkillBase):
                 "required": False,
                 "enum": ["basic", "spacy", "nltk"]
             },
+            "backend": {
+                "type": "string",
+                "description": "Storage backend for local database mode: 'sqlite' for file-based or 'pgvector' for PostgreSQL. Ignored if remote_url is set",
+                "default": "sqlite",
+                "required": False,
+                "enum": ["sqlite", "pgvector"]
+            },
+            "connection_string": {
+                "type": "string",
+                "description": "PostgreSQL connection string (pgvector backend only, e.g., 'postgresql://user:pass@localhost:5432/dbname'). Required when backend='pgvector'",
+                "required": False
+            },
+            "collection_name": {
+                "type": "string",
+                "description": "Collection/table name in PostgreSQL (pgvector backend only). Required when backend='pgvector'",
+                "required": False
+            },
             "verbose": {
                 "type": "boolean",
                 "description": "Enable verbose logging",
@@ -188,6 +211,9 @@ class NativeVectorSearchSkill(SkillBase):
         
         # Get configuration first
         self.tool_name = self.params.get('tool_name', 'search_knowledge')
+        self.backend = self.params.get('backend', 'sqlite')
+        self.connection_string = self.params.get('connection_string')
+        self.collection_name = self.params.get('collection_name')
         self.index_file = self.params.get('index_file')
         self.build_index = self.params.get('build_index', False)
         self.source_dir = self.params.get('source_dir')
@@ -298,13 +324,32 @@ class NativeVectorSearchSkill(SkillBase):
         
         # Initialize local search engine
         self.search_engine = None
-        if self.search_available and self.index_file and os.path.exists(self.index_file):
-            try:
-                from signalwire_agents.search import SearchEngine
-                self.search_engine = SearchEngine(self.index_file)
-            except Exception as e:
-                self.logger.error(f"Failed to load search index {self.index_file}: {e}")
-                self.search_available = False
+        if self.search_available:
+            if self.backend == 'pgvector':
+                # Initialize pgvector backend
+                if self.connection_string and self.collection_name:
+                    try:
+                        from signalwire_agents.search import SearchEngine
+                        self.search_engine = SearchEngine(
+                            backend='pgvector',
+                            connection_string=self.connection_string,
+                            collection_name=self.collection_name
+                        )
+                        self.logger.info(f"Connected to pgvector collection: {self.collection_name}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to connect to pgvector: {e}")
+                        self.search_available = False
+                else:
+                    self.logger.error("pgvector backend requires connection_string and collection_name")
+                    self.search_available = False
+            elif self.index_file and os.path.exists(self.index_file):
+                # Initialize SQLite backend
+                try:
+                    from signalwire_agents.search import SearchEngine
+                    self.search_engine = SearchEngine(backend='sqlite', index_path=self.index_file)
+                except Exception as e:
+                    self.logger.error(f"Failed to load search index {self.index_file}: {e}")
+                    self.search_available = False
         
         return True
         

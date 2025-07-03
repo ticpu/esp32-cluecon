@@ -82,16 +82,21 @@ else:
             self.query_analysis = query_analysis
 
 class SearchService:
-    """Local search service with HTTP API"""
+    """Local search service with HTTP API supporting both SQLite and pgvector backends"""
     
     def __init__(self, port: int = 8001, indexes: Dict[str, str] = None, 
                  basic_auth: Optional[Tuple[str, str]] = None,
-                 config_file: Optional[str] = None):
+                 config_file: Optional[str] = None,
+                 backend: str = 'sqlite',
+                 connection_string: Optional[str] = None):
         # Load configuration first
         self._load_config(config_file)
         
         # Override with constructor params if provided
         self.port = port
+        self.backend = backend
+        self.connection_string = connection_string
+        
         if indexes is not None:
             self.indexes = indexes
         
@@ -119,6 +124,8 @@ class SearchService:
         """Load configuration from file if available"""
         # Initialize defaults
         self.indexes = {}
+        self.backend = 'sqlite'
+        self.connection_string = None
         
         # Find config file
         if not config_file:
@@ -139,6 +146,12 @@ class SearchService:
         if service_config:
             if 'port' in service_config:
                 self.port = int(service_config['port'])
+            
+            if 'backend' in service_config:
+                self.backend = service_config['backend']
+                
+            if 'connection_string' in service_config:
+                self.connection_string = service_config['connection_string']
             
             if 'indexes' in service_config and isinstance(service_config['indexes'], dict):
                 self.indexes = service_config['indexes']
@@ -225,9 +238,11 @@ class SearchService:
         async def health():
             return {
                 "status": "healthy", 
+                "backend": self.backend,
                 "indexes": list(self.indexes.keys()),
                 "ssl_enabled": self.security.ssl_enabled,
-                "auth_required": bool(security)
+                "auth_required": bool(security),
+                "connection_string": self.connection_string if self.backend == 'pgvector' else None
             }
         
         @self.app.post("/reload_index")
@@ -236,47 +251,83 @@ class SearchService:
             index_path: str,
             credentials: HTTPBasicCredentials = None if not security else Depends(security)
         ):
-            """Reload or add new index"""
+            """Reload or add new index/collection"""
             if security:
                 self._get_current_username(credentials)
-                
-            self.indexes[index_name] = index_path
-            self.search_engines[index_name] = SearchEngine(index_path, self.model)
-            return {"status": "reloaded", "index": index_name}
+            
+            if self.backend == 'pgvector':
+                # For pgvector, index_path is actually the collection name
+                self.indexes[index_name] = index_path
+                try:
+                    self.search_engines[index_name] = SearchEngine(
+                        backend='pgvector',
+                        connection_string=self.connection_string,
+                        collection_name=index_path
+                    )
+                    return {"status": "reloaded", "index": index_name, "backend": "pgvector"}
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Failed to load pgvector collection: {e}")
+            else:
+                # SQLite backend
+                self.indexes[index_name] = index_path
+                self.search_engines[index_name] = SearchEngine(index_path, self.model)
+                return {"status": "reloaded", "index": index_name, "backend": "sqlite"}
     
     def _load_resources(self):
         """Load embedding model and search indexes"""
-        # Load model (shared across all indexes)
-        if self.indexes and SentenceTransformer:
-            # Get model name from first index
-            sample_index = next(iter(self.indexes.values()))
-            model_name = self._get_model_name(sample_index)
-            try:
-                self.model = SentenceTransformer(model_name)
-            except Exception as e:
-                logger.warning(f"Could not load sentence transformer model: {e}")
-                self.model = None
-        
-        # Load search engines for each index
-        for index_name, index_path in self.indexes.items():
-            try:
-                self.search_engines[index_name] = SearchEngine(index_path, self.model)
-            except Exception as e:
-                logger.error(f"Error loading search engine for {index_name}: {e}")
+        if self.backend == 'pgvector':
+            # For pgvector, we don't need to load a model locally
+            # The embeddings are already stored in the database
+            # Load search engines for each collection
+            for collection_name in self.indexes.keys():
+                try:
+                    self.search_engines[collection_name] = SearchEngine(
+                        backend='pgvector',
+                        connection_string=self.connection_string,
+                        collection_name=collection_name
+                    )
+                    logger.info(f"Loaded pgvector collection: {collection_name}")
+                except Exception as e:
+                    logger.error(f"Error loading pgvector collection {collection_name}: {e}")
+        else:
+            # SQLite backend - original behavior
+            # Load model (shared across all indexes)
+            if self.indexes and SentenceTransformer:
+                # Get model name from first index
+                sample_index = next(iter(self.indexes.values()))
+                model_name = self._get_model_name(sample_index)
+                try:
+                    self.model = SentenceTransformer(model_name)
+                except Exception as e:
+                    logger.warning(f"Could not load sentence transformer model: {e}")
+                    self.model = None
+            
+            # Load search engines for each index
+            for index_name, index_path in self.indexes.items():
+                try:
+                    self.search_engines[index_name] = SearchEngine(index_path, self.model)
+                except Exception as e:
+                    logger.error(f"Error loading search engine for {index_name}: {e}")
     
     def _get_model_name(self, index_path: str) -> str:
         """Get embedding model name from index config"""
-        try:
-            import sqlite3
-            conn = sqlite3.connect(index_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM config WHERE key = 'embedding_model'")
-            result = cursor.fetchone()
-            conn.close()
-            return result[0] if result else 'sentence-transformers/all-mpnet-base-v2'
-        except Exception as e:
-            logger.warning(f"Could not get model name from index: {e}")
+        if self.backend == 'pgvector':
+            # For pgvector, we might want to store model info in the database
+            # For now, return default model
             return 'sentence-transformers/all-mpnet-base-v2'
+        else:
+            # SQLite backend
+            try:
+                import sqlite3
+                conn = sqlite3.connect(index_path)
+                cursor = conn.cursor()
+                cursor.execute("SELECT value FROM config WHERE key = 'embedding_model'")
+                result = cursor.fetchone()
+                conn.close()
+                return result[0] if result else 'sentence-transformers/all-mpnet-base-v2'
+            except Exception as e:
+                logger.warning(f"Could not get model name from index: {e}")
+                return 'sentence-transformers/all-mpnet-base-v2'
     
     async def _handle_search(self, request: SearchRequest) -> SearchResponse:
         """Handle search request"""

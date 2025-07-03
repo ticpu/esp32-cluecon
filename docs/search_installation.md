@@ -91,7 +91,7 @@ pip install signalwire-agents[search-all]
 ```
 
 **Size:** ~700MB  
-**Includes:** All search features combined
+**Includes:** All search features combined + pgvector support
 
 **⚠️ Additional Setup Required:**
 After installation, you must download the spaCy language model:
@@ -106,19 +106,38 @@ You can control which NLP backend to use with the `nlp_backend` parameter:
 - `"nltk"` (default): Fast processing
 - `"spacy"`: Better quality but slower, requires model download
 
+### PostgreSQL pgvector Support
+For scalable vector search with PostgreSQL:
+
+```bash
+# Just pgvector support
+pip install signalwire-agents[pgvector]
+
+# Or with search features
+pip install signalwire-agents[search,pgvector]
+
+# Already included in search-all
+pip install signalwire-agents[search-all]
+```
+
+**Includes:** psycopg2-binary, pgvector  
+**Use Case:** Multi-agent deployments, centralized knowledge bases, production systems
+
 ## Feature Comparison
 
-| Feature | Basic | Full | NLP | All |
-|---------|-------|------|-----|-----|
-| Vector embeddings | ✅ | ✅ | ✅ | ✅ |
-| Keyword search | ✅ | ✅ | ✅ | ✅ |
-| Text files (txt, md) | ✅ | ✅ | ✅ | ✅ |
-| PDF processing | ❌ | ✅ | ❌ | ✅ |
-| DOCX processing | ❌ | ✅ | ❌ | ✅ |
-| Excel/PowerPoint | ❌ | ✅ | ❌ | ✅ |
-| Advanced NLP | ❌ | ❌ | ✅ | ✅ |
-| POS tagging | ❌ | ❌ | ✅ | ✅ |
-| Named entity recognition | ❌ | ❌ | ✅ | ✅ |
+| Feature | Basic | Full | NLP | All | pgvector |
+|---------|-------|------|-----|-----|----------|
+| Vector embeddings | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Keyword search | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Text files (txt, md) | ✅ | ✅ | ✅ | ✅ | ❌ |
+| PDF processing | ❌ | ✅ | ❌ | ✅ | ❌ |
+| DOCX processing | ❌ | ✅ | ❌ | ✅ | ❌ |
+| Excel/PowerPoint | ❌ | ✅ | ❌ | ✅ | ❌ |
+| Advanced NLP | ❌ | ❌ | ✅ | ✅ | ❌ |
+| POS tagging | ❌ | ❌ | ✅ | ✅ | ❌ |
+| Named entity recognition | ❌ | ❌ | ✅ | ✅ | ❌ |
+| PostgreSQL support | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Scalable vector search | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 ## Checking Installation
 
@@ -139,6 +158,7 @@ Once installed, you can start using search functionality:
 
 ### 1. Build a Search Index
 
+#### SQLite Backend (Default)
 ```bash
 # Using the CLI tool with the comprehensive concepts guide
 sw-search docs/signalwire_agents_concepts_guide.md --output concepts.swsearch
@@ -148,35 +168,77 @@ sw-search docs/signalwire_agents_concepts_guide.md examples README.md --file-typ
 
 # Traditional directory approach
 sw-search ./docs --output knowledge.swsearch --file-types md,txt,pdf
+```
 
-# Or in Python
+#### PostgreSQL pgvector Backend
+```bash
+# Build index in PostgreSQL
+sw-search ./docs \
+  --backend pgvector \
+  --connection-string "postgresql://user:pass@localhost/dbname" \
+  --output docs_collection
+
+# Overwrite existing collection
+sw-search ./docs \
+  --backend pgvector \
+  --connection-string "postgresql://user:pass@localhost/dbname" \
+  --output docs_collection \
+  --overwrite
+```
+
+#### Python API
+```python
 from signalwire_agents.search import IndexBuilder
 from pathlib import Path
 
+# SQLite backend
 builder = IndexBuilder()
-# Build from specific file
 builder.build_index_from_sources(
     sources=[Path("docs/signalwire_agents_concepts_guide.md")],
     output_file="concepts.swsearch",
     file_types=['md']
 )
 
-# Build from multiple sources
+# pgvector backend
+builder = IndexBuilder(
+    backend='pgvector',
+    connection_string='postgresql://user:pass@localhost/dbname'
+)
 builder.build_index_from_sources(
-    sources=[Path("docs/signalwire_agents_concepts_guide.md"), Path("examples"), Path("README.md")],
-    output_file="comprehensive.swsearch",
-    file_types=['md', 'py', 'txt']
+    sources=[Path("docs"), Path("README.md")],
+    output_file="docs_collection",
+    file_types=['md', 'txt'],
+    overwrite=True  # Drop existing collection first
 )
 ```
 
 ### 2. Search Documents
 
+#### Command Line
+```bash
+# Search SQLite index
+sw-search search concepts.swsearch "how to build agents"
+
+# Search pgvector collection
+sw-search search docs_collection "how to build agents" \
+  --backend pgvector \
+  --connection-string "postgresql://user:pass@localhost/dbname"
+```
+
+#### Python API
 ```python
 from signalwire_agents.search import SearchEngine
 from signalwire_agents.search.query_processor import preprocess_query
 
-# Load search engine with concepts guide
+# SQLite backend
 engine = SearchEngine("concepts.swsearch")
+
+# pgvector backend
+engine = SearchEngine(
+    backend='pgvector',
+    connection_string='postgresql://user:pass@localhost/dbname',
+    collection_name='docs_collection'
+)
 
 # Preprocess query
 enhanced = preprocess_query("How do I build agents?", vector=True)

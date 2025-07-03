@@ -26,11 +26,38 @@ logger = logging.getLogger(__name__)
 class SearchEngine:
     """Hybrid search engine for vector and keyword search"""
     
-    def __init__(self, index_path: str, model=None):
-        self.index_path = index_path
+    def __init__(self, backend: str = 'sqlite', index_path: Optional[str] = None, 
+                 connection_string: Optional[str] = None, collection_name: Optional[str] = None,
+                 model=None):
+        """
+        Initialize search engine
+        
+        Args:
+            backend: Storage backend ('sqlite' or 'pgvector')
+            index_path: Path to .swsearch file (for sqlite backend)
+            connection_string: PostgreSQL connection string (for pgvector backend)
+            collection_name: Collection name (for pgvector backend)
+            model: Optional sentence transformer model
+        """
+        self.backend = backend
         self.model = model
-        self.config = self._load_config()
-        self.embedding_dim = int(self.config.get('embedding_dimensions', 768))
+        
+        if backend == 'sqlite':
+            if not index_path:
+                raise ValueError("index_path is required for sqlite backend")
+            self.index_path = index_path
+            self.config = self._load_config()
+            self.embedding_dim = int(self.config.get('embedding_dimensions', 768))
+            self._backend = None  # SQLite uses direct connection
+        elif backend == 'pgvector':
+            if not connection_string or not collection_name:
+                raise ValueError("connection_string and collection_name are required for pgvector backend")
+            from .pgvector_backend import PgVectorSearchBackend
+            self._backend = PgVectorSearchBackend(connection_string, collection_name)
+            self.config = self._backend.config
+            self.embedding_dim = int(self.config.get('embedding_dimensions', 768))
+        else:
+            raise ValueError(f"Invalid backend '{backend}'. Must be 'sqlite' or 'pgvector'")
     
     def _load_config(self) -> Dict[str, str]:
         """Load index configuration"""
@@ -62,6 +89,11 @@ class SearchEngine:
             List of search results with scores and metadata
         """
         
+        # Use pgvector backend if available
+        if self.backend == 'pgvector':
+            return self._backend.search(query_vector, enhanced_text, count, distance_threshold, tags)
+        
+        # Original SQLite implementation
         if not np or not cosine_similarity:
             logger.warning("NumPy or scikit-learn not available. Using keyword search only.")
             return self._keyword_search_only(enhanced_text, count, tags)
@@ -333,6 +365,11 @@ class SearchEngine:
     
     def get_stats(self) -> Dict[str, Any]:
         """Get statistics about the search index"""
+        # Use pgvector backend if available
+        if self.backend == 'pgvector':
+            return self._backend.get_stats()
+        
+        # Original SQLite implementation
         conn = sqlite3.connect(self.index_path)
         cursor = conn.cursor()
         

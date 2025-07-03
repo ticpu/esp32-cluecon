@@ -380,6 +380,36 @@ self.add_skill("native_vector_search", {
 })
 ```
 
+## Backend Selection
+
+The search system supports multiple storage backends:
+
+### SQLite Backend (Default)
+- **File-based**: Stores indexes in `.swsearch` files
+- **Portable**: Single file contains everything
+- **Simple**: No external dependencies
+- **Best for**: Single-agent deployments, development, small to medium datasets
+
+### PostgreSQL pgvector Backend
+- **Server-based**: Uses PostgreSQL with pgvector extension
+- **Scalable**: Efficient similarity search with IVFFlat/HNSW indexes
+- **Concurrent**: Multiple agents can share the same knowledge base
+- **Real-time updates**: Add/remove documents without rebuilding
+- **Best for**: Production deployments, multi-agent systems, large datasets
+
+### Choosing a Backend
+
+| Feature | SQLite | pgvector |
+|---------|--------|----------|
+| Setup complexity | None | Requires PostgreSQL |
+| Scalability | Limited | Excellent |
+| Concurrent access | Poor | Excellent |
+| Update capability | Rebuild required | Real-time |
+| Performance (small) | Excellent | Good |
+| Performance (large) | Poor | Excellent |
+| Deployment | File copy | Database connection |
+| Multi-agent | Separate copies | Shared knowledge |
+
 ## Local vs Remote Modes
 
 The search skill supports both local and remote operation modes.
@@ -472,7 +502,10 @@ sw-search <source_dir> [options]
 - `source_dir` - Directory containing documents to index
 
 **Options:**
-- `--output FILE` - Output .swsearch file (default: `<source_dir>.swsearch`)
+- `--output FILE` - Output .swsearch file (default: `<source_dir>.swsearch`) or collection name for pgvector
+- `--backend {sqlite,pgvector}` - Storage backend (default: sqlite)
+- `--connection-string STRING` - PostgreSQL connection string for pgvector backend
+- `--overwrite` - Overwrite existing collection (pgvector only)
 - `--chunk-size SIZE` - Chunk size in characters (default: 500)
 - `--chunk-overlap SIZE` - Overlap between chunks (default: 50)
 - `--file-types TYPES` - Comma-separated file extensions (default: md,txt,rst)
@@ -496,16 +529,18 @@ Validates an existing .swsearch index file and shows statistics.
 #### search - Search Within Index
 
 ```bash
-sw-search search <index_file> <query> [options]
+sw-search search <index_source> <query> [options]
 ```
 
-Search within an existing .swsearch index file. This is useful for:
+Search within an existing .swsearch index file or pgvector collection. This is useful for:
 - Testing search quality and relevance
 - Exploring index contents
 - Debugging search results
 - Scripting and automation
 
 **Search Options:**
+- `--backend {sqlite,pgvector}` - Storage backend (default: sqlite)
+- `--connection-string STRING` - PostgreSQL connection string for pgvector backend
 - `--count COUNT` - Number of results to return (default: 5)
 - `--distance-threshold FLOAT` - Minimum similarity score (default: 0.0)
 - `--tags TAGS` - Comma-separated tags to filter by
@@ -517,6 +552,7 @@ Search within an existing .swsearch index file. This is useful for:
 **Examples:**
 
 ```bash
+# SQLite Backend (Default)
 # Build from the comprehensive concepts guide
 sw-search docs/signalwire_agents_concepts_guide.md --output concepts.swsearch
 
@@ -526,23 +562,40 @@ sw-search docs/signalwire_agents_concepts_guide.md examples README.md \
     --file-types md,py,txt \
     --verbose
 
-# Traditional directory-based approach
-sw-search ./documentation \
-    --output knowledge.swsearch \
-    --chunking-strategy sentence \
-    --max-sentences-per-chunk 8 \
-    --file-types md,rst,txt \
-    --exclude "**/drafts/**" \
-    --tags documentation,help \
+# PostgreSQL pgvector Backend
+# Build index in PostgreSQL
+sw-search ./docs \
+    --backend pgvector \
+    --connection-string "postgresql://user:pass@localhost/dbname" \
+    --output docs_collection \
+    --file-types md,txt \
     --verbose
+
+# Overwrite existing pgvector collection
+sw-search ./docs \
+    --backend pgvector \
+    --connection-string "postgresql://user:pass@localhost/dbname" \
+    --output docs_collection \
+    --overwrite
 
 # Validate an existing index
 sw-search validate concepts.swsearch --verbose
 
-# Search within an index
+# Search within SQLite index
 sw-search search concepts.swsearch "how to create an agent"
 sw-search search concepts.swsearch "API reference" --count 3 --verbose
 sw-search search concepts.swsearch "configuration" --tags documentation --json
+
+# Search within pgvector collection
+sw-search search docs_collection "how to create an agent" \
+    --backend pgvector \
+    --connection-string "postgresql://user:pass@localhost/dbname"
+
+sw-search search docs_collection "configuration" \
+    --backend pgvector \
+    --connection-string "postgresql://user:pass@localhost/dbname" \
+    --count 10 \
+    --json
 
 # Use different NLP backends
 sw-search search concepts.swsearch "deployment options" --nlp-backend nltk  # Fast
