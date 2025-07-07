@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.38] - 2025-07-07
+
+- Version bump
+
+## [0.1.37] - 2025-07-07
+
+- Version bump
+
 ## [Unreleased]
 
 ### Added
