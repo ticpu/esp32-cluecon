@@ -206,7 +206,7 @@ BedrockAgent generates SWML with the `amazon_bedrock` verb:
 2. **Voice Configuration**: Voice ID is included in the prompt object (Bedrock-specific)
 3. **Fixed Model**: Cannot change the underlying model (always uses Bedrock voice-to-voice)
 4. **Parameter Handling**: Simplified parameter configuration focused on inference settings
-5. **Post-Prompt**: Post-prompt summarization still uses OpenAI (configured in C code)
+5. **Post-Prompt**: Post-prompt summarization still uses OpenAI
 
 ## Testing with swaig-test
 
@@ -345,9 +345,9 @@ agent.enable_debug_routes()
 
 ## Limitations
 
-- Cannot change the underlying AI model (fixed to Bedrock voice-to-voice)
-- Post-prompt summarization uses OpenAI (not Bedrock)
-- Some advanced OpenAI-specific features may not be available
+- Cannot change the underlying AI model (Bedrock uses a fixed voice-to-voice model)
+- Post-prompt summarization uses OpenAI for compatibility with existing integrations
+- Text-specific features like hints and pronunciation rules don't apply to voice models
 - Voice options limited to Bedrock's available voices
 
 ## See Also
@@ -375,9 +375,9 @@ The `amazon_bedrock` verb in SWML supports the following keys:
 - **params**: `temperature`, `top_p`, `max_tokens`
 - **global_data**: (any custom key-value pairs)
 
-**NOT supported** (unlike the `ai` verb):
-- `languages` - Language configuration
-- `hints` - AI hints
-- `pronounce` - Pronunciation rules
+**Features not applicable to voice-to-voice models:**
+- `languages` - Language configuration (voice models handle languages natively through voice)
+- `hints` - AI hints (voice models process audio directly without text hints)
+- `pronounce` - Pronunciation rules (not needed as voice input preserves pronunciation)
 
-These unsupported features are limitations of the current Bedrock implementation in C.
+These features are designed for text-based AI models and don't apply to Bedrock's voice-to-voice architecture.
