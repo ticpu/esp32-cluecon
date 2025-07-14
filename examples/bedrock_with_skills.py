@@ -42,7 +42,7 @@ print("✓ weather_api skill added")
 
 
 # Add web_search skill with Google Custom Search API credentials
-google_api_key = os.environ.get("GOOGLE_API_KEY", "")
+google_api_key = os.environ.get("GOOGLE_SEARCH_API_KEY", "")
 google_search_engine_id = os.environ.get("GOOGLE_SEARCH_ENGINE_ID", "")
 
 if google_api_key and google_search_engine_id:
