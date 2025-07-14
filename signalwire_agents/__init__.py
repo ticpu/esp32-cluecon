@@ -29,6 +29,7 @@ from signalwire_agents.core.swml_service import SWMLService
 from signalwire_agents.core.swml_builder import SWMLBuilder
 from signalwire_agents.core.function_result import SwaigFunctionResult
 from signalwire_agents.core.swaig_function import SWAIGFunction
+from signalwire_agents.agents.bedrock import BedrockAgent
 
 # Lazy import skills to avoid slow startup for CLI tools
 # Skills are now loaded on-demand when requested
@@ -142,5 +143,6 @@ __all__ = [
     "list_skills",
     "list_skills_with_params",
     "register_skill",
-    "add_skill_directory"
+    "add_skill_directory",
+    "BedrockAgent"
 ]
