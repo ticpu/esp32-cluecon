@@ -118,8 +118,9 @@ class BedrockAgent(AgentBase):
                         # Copy SWAIG if present
                         "SWAIG": ai_config.get("SWAIG", {}),
                         
-                        # Include params if they exist in ai_config OR generate Bedrock params
-                        "params": ai_config.get("params") or self._build_bedrock_params({}),
+                        # Include params only if they were explicitly set via set_params()
+                        # The C++ code ignores params for now (marked for future extensibility)
+                        "params": ai_config.get("params", {}),
                         
                         # Copy global_data if present
                         "global_data": ai_config.get("global_data", {}),
