@@ -111,15 +111,15 @@ class BedrockAgent(AgentBase):
                 # Build amazon_bedrock verb with same structure
                 bedrock_verb = {
                     "amazon_bedrock": {
-                        # Add voice configuration inside prompt
-                        # Note: In Bedrock, voice is part of prompt config
+                        # Add voice configuration and inference params inside prompt
+                        # Note: In Bedrock, voice and inference params are part of prompt config
                         "prompt": self._add_voice_to_prompt(ai_config.get("prompt", {})),
                         
                         # Copy SWAIG if present
                         "SWAIG": ai_config.get("SWAIG", {}),
                         
-                        # Build params with Bedrock-specific values
-                        "params": self._build_bedrock_params(ai_config.get("params", {})),
+                        # Include params if they exist in ai_config OR generate Bedrock params
+                        "params": ai_config.get("params") or self._build_bedrock_params({}),
                         
                         # Copy global_data if present
                         "global_data": ai_config.get("global_data", {}),
@@ -159,9 +159,25 @@ class BedrockAgent(AgentBase):
         Returns:
             Updated prompt configuration with voice
         """
+        # Create a clean copy, filtering out text-model-specific parameters
+        # that don't apply to Bedrock's voice-to-voice model
+        filtered_config = {}
+        
+        # Copy over only the relevant fields
+        for key, value in prompt_config.items():
+            # Skip text-model-specific parameters
+            if key in ['barge_confidence', 'presence_penalty', 'frequency_penalty']:
+                continue
+            filtered_config[key] = value
+        
         # Add voice_id to the prompt configuration
-        prompt_config["voice_id"] = self._voice_id
-        return prompt_config
+        filtered_config["voice_id"] = self._voice_id
+        
+        # Add/override inference parameters (where C code expects them)
+        filtered_config["temperature"] = self._temperature
+        filtered_config["top_p"] = self._top_p
+        
+        return filtered_config
     
     def _build_bedrock_params(self, base_params: Dict[str, Any]) -> Dict[str, Any]:
         """

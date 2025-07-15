@@ -370,7 +370,7 @@ The `amazon_bedrock` verb in SWML supports the following keys:
 - `post_prompt_url` - URL for posting conversation summaries
 
 **Within nested objects:**
-- **prompt**: `text`, `voice_id`, `temperature`, `top_p`, `barge_confidence`, `presence_penalty`, `frequency_penalty`
+- **prompt**: `text`, `pom`, `voice_id`, `temperature`, `top_p`
 - **SWAIG**: `functions`, `defaults`
 - **params**: `temperature`, `top_p`, `max_tokens`
 - **global_data**: (any custom key-value pairs)
@@ -379,5 +379,8 @@ The `amazon_bedrock` verb in SWML supports the following keys:
 - `languages` - Language configuration (voice models handle languages natively through voice)
 - `hints` - AI hints (voice models process audio directly without text hints)
 - `pronounce` - Pronunciation rules (not needed as voice input preserves pronunciation)
+- `barge_confidence` - ASR confidence threshold (not applicable to voice-to-voice)
+- `presence_penalty` - Topic diversity control (text model parameter)
+- `frequency_penalty` - Repetition control (text model parameter)
 
 These features are designed for text-based AI models and don't apply to Bedrock's voice-to-voice architecture.
