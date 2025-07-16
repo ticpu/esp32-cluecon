@@ -121,9 +121,10 @@ class AgentBase(
         agent_id: Optional[str] = None,
         native_functions: Optional[List[str]] = None,
         schema_path: Optional[str] = None,
-        suppress_logs: bool = False,
+                suppress_logs: bool = False,
         enable_post_prompt_override: bool = False,
-        check_for_input_override: bool = False
+        check_for_input_override: bool = False,
+        config_file: Optional[str] = None
     ):
         """
         Initialize a new agent
@@ -147,6 +148,7 @@ class AgentBase(
             suppress_logs: Whether to suppress structured logs
             enable_post_prompt_override: Whether to enable post-prompt override
             check_for_input_override: Whether to enable check-for-input override
+            config_file: Optional path to configuration file
         """
         # Import SWMLService here to avoid circular imports
         from signalwire_agents.core.swml_service import SWMLService
@@ -154,14 +156,24 @@ class AgentBase(
         # If schema_path is not provided, we'll let SWMLService find it through its _find_schema_path method
         # which will be called in its __init__
         
+        # Load service configuration from config file before initializing SWMLService
+        service_config = self._load_service_config(config_file, name)
+        
+        # Apply service config values, with constructor parameters taking precedence
+        final_route = route if route != "/" else service_config.get('route', route)
+        final_host = host if host != "0.0.0.0" else service_config.get('host', host)
+        final_port = port if port != 3000 else service_config.get('port', port)
+        final_name = service_config.get('name', name)
+        
         # Initialize the SWMLService base class
         super().__init__(
-            name=name,
-            route=route,
-            host=host,
-            port=port,
+            name=final_name,
+            route=final_route,
+            host=final_host,
+            port=final_port,
             basic_auth=basic_auth,
-            schema_path=schema_path
+            schema_path=schema_path,
+            config_file=config_file
         )
         
         # Log the schema path if found and not suppressing logs
@@ -262,6 +274,30 @@ class AgentBase(
         # Initialize contexts system
         self._contexts_builder = None
         self._contexts_defined = False
+    
+    @staticmethod
+    def _load_service_config(config_file: Optional[str], service_name: str) -> dict:
+        """Load service configuration from config file if available"""
+        from signalwire_agents.core.config_loader import ConfigLoader
+        
+        # Find config file
+        if not config_file:
+            config_file = ConfigLoader.find_config_file(service_name)
+        
+        if not config_file:
+            return {}
+            
+        # Load config
+        config_loader = ConfigLoader([config_file])
+        if not config_loader.has_config():
+            return {}
+        
+        # Get service section
+        service_config = config_loader.get_section('service')
+        if service_config:
+            return service_config
+            
+        return {}
         
         # Initialize SWAIG query params for dynamic config
         self._swaig_query_params = {}
