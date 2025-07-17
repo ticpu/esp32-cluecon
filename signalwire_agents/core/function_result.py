@@ -611,7 +611,8 @@ class SwaigFunctionResult:
            currency: str = "usd", language: str = "en-US", voice: str = "woman",
            description: Optional[str] = None, valid_card_types: str = "visa mastercard amex",
            parameters: Optional[List[Dict[str, str]]] = None,
-           prompts: Optional[List[Dict[str, Any]]] = None) -> 'SwaigFunctionResult':
+           prompts: Optional[List[Dict[str, Any]]] = None,
+           ai_response: Optional[str] = "The payment status is ${pay_payment_results}, do not mention anything else about collecting payment if successful.") -> 'SwaigFunctionResult':
         """
         Process payment using SWML pay action.
         
@@ -679,6 +680,7 @@ class SwaigFunctionResult:
             "version": "1.0.0",
             "sections": {
                 "main": [
+                    {"set": {"ai_response": ai_response}},
                     {"pay": pay_params}
                 ]
             }
