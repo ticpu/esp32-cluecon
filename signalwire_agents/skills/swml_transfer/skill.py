@@ -270,9 +270,15 @@ class SWMLTransferSkill(SkillBase):
         # Extract common words from patterns for hints
         for pattern in self.transfers.keys():
             # Remove regex delimiters and flags
-            clean_pattern = pattern.strip('/')
-            if clean_pattern.endswith('i'):
+            clean_pattern = pattern
+            # Remove leading and trailing slashes
+            if clean_pattern.startswith('/'):
+                clean_pattern = clean_pattern[1:]
+            if clean_pattern.endswith('/'):
                 clean_pattern = clean_pattern[:-1]
+            # Remove flags after the pattern (e.g., 'i' for case-insensitive)
+            elif clean_pattern.endswith('/i'):
+                clean_pattern = clean_pattern[:-2]
             
             # Only add if it's not a catch-all pattern
             if clean_pattern and not clean_pattern.startswith('.'):
@@ -299,9 +305,15 @@ class SWMLTransferSkill(SkillBase):
             for pattern, config in self.transfers.items():
                 # Extract meaningful name from pattern
                 # Remove regex delimiters and flags
-                clean_pattern = pattern.strip('/')
-                if clean_pattern.endswith('i'):
+                clean_pattern = pattern
+                # Remove leading and trailing slashes
+                if clean_pattern.startswith('/'):
+                    clean_pattern = clean_pattern[1:]
+                if clean_pattern.endswith('/'):
                     clean_pattern = clean_pattern[:-1]
+                # Remove flags after the pattern (e.g., 'i' for case-insensitive)
+                elif clean_pattern.endswith('/i'):
+                    clean_pattern = clean_pattern[:-2]
                 
                 # Only add if it's not a catch-all pattern
                 if clean_pattern and not clean_pattern.startswith('.'):
