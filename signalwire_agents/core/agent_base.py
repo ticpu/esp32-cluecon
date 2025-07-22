@@ -274,6 +274,9 @@ class AgentBase(
         # Initialize contexts system
         self._contexts_builder = None
         self._contexts_defined = False
+        
+        # Initialize SWAIG query params for dynamic config
+        self._swaig_query_params = {}
     
     @staticmethod
     def _load_service_config(config_file: Optional[str], service_name: str) -> dict:
@@ -298,13 +301,6 @@ class AgentBase(
             return service_config
             
         return {}
-        
-        # Initialize SWAIG query params for dynamic config
-        self._swaig_query_params = {}
-        
-        self.schema_utils = SchemaUtils(schema_path)
-        if self.schema_utils and self.schema_utils.schema:
-            self.log.debug("schema_loaded", path=self.schema_utils.schema_path)
     
     def get_name(self) -> str:
         """
