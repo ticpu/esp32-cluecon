@@ -21,8 +21,9 @@ except ImportError:
 # OpenAI Configuration
 OPENAI_MODEL = "gpt-4o-mini"  # Using 4o-mini as it's more available than 4.1-nano
 
-# PageKite Configuration
-PAGEKITE_DOMAIN = "yourname.pagekite.me"  # Replace with your actual domain
+# PageKite Configuration (can be overridden in secrets files)
+if 'PAGEKITE_DOMAIN' not in locals():
+    PAGEKITE_DOMAIN = "yourname.pagekite.me"  # Default value
 
 # Application Settings
 DEBUG = True

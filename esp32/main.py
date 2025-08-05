@@ -10,6 +10,7 @@ from machine import Pin
 import neopixel
 from collections import deque
 import config
+from upagekite_handler import start_pagekite_tunnel, is_pagekite_running
 
 # NeoPixel Status Indicator
 class StatusIndicator:
@@ -223,7 +224,9 @@ class WebhookServer:
                         "device": config.DEVICE_NAME,
                         "buffer_size": len(self.word_buffer.buffer),
                         "webhook_path": config.CALLBACK_PATH,
-                        "reset_path": config.RESET_PATH
+                        "reset_path": config.RESET_PATH,
+                        "pagekite_running": is_pagekite_running(),
+                        "pagekite_domain": config.PAGEKITE_DOMAIN
                     })
                     await self.send_response(writer, 200, response, "application/json")
                 else:
@@ -312,6 +315,14 @@ async def main():
     )
 
     print("Server ready!")
+
+    # Start PageKite tunnel
+    print("Starting PageKite tunnel...")
+    pagekite_success = await start_pagekite_tunnel(webhook_server)
+    if not pagekite_success:
+        print("Warning: PageKite tunnel failed to start")
+        status_indicator.set_status('error')
+        await asyncio.sleep(2)  # Show error briefly
 
     # Set status to idle (green) when server is ready
     status_indicator.set_status('idle')
