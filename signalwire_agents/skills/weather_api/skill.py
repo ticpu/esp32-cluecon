@@ -22,15 +22,15 @@ from signalwire_agents.core.skill_base import SkillBase
 class WeatherApiSkill(SkillBase):
     """
     Skill for getting weather information from WeatherAPI.com.
-    
+
     Provides current weather data with configurable temperature units and
     TTS-optimized natural language responses.
-    
+
     Configuration:
     - tool_name: Custom name for the generated SWAIG function
     - api_key: WeatherAPI.com API key
     - temperature_unit: "fahrenheit" or "celsius" for temperature display
-    
+
     Example:
         agent.add_skill("weather_api", {
             "tool_name": "get_weather",
@@ -38,12 +38,12 @@ class WeatherApiSkill(SkillBase):
             "temperature_unit": "fahrenheit"
         })
     """
-    
+
     SKILL_NAME = "weather_api"
     SKILL_DESCRIPTION = "Get current weather information from WeatherAPI.com"
     SUPPORTS_MULTIPLE_INSTANCES = False
     REQUIRED_ENV_VARS = []  # API key can be passed via params
-    
+
     @classmethod
     def get_parameter_schema(cls) -> Dict[str, Dict[str, Any]]:
         """Get parameter schema for weather API skill"""
@@ -71,11 +71,11 @@ class WeatherApiSkill(SkillBase):
             }
         })
         return schema
-    
+
     def __init__(self, agent, params: Dict[str, Any] = None):
         """
         Initialize the skill with configuration parameters.
-        
+
         Args:
             agent: The agent instance this skill belongs to
             params: Configuration dictionary containing:
@@ -84,35 +84,35 @@ class WeatherApiSkill(SkillBase):
                 - temperature_unit: "fahrenheit" or "celsius" (default: "fahrenheit")
         """
         super().__init__(agent, params)
-        
+
         # Extract configuration
         self.tool_name = self.params.get('tool_name', 'get_weather')
         self.api_key = self.params.get('api_key')
         self.temperature_unit = self.params.get('temperature_unit', 'fahrenheit')
-        
+
         # Validate configuration
         self._validate_config()
-    
+
     def _validate_config(self):
         """Validate the skill configuration."""
         # Validate API key
         if not self.api_key or not isinstance(self.api_key, str):
             raise ValueError("api_key parameter is required and must be a non-empty string")
-        
+
         # Validate temperature unit
         if self.temperature_unit not in ['fahrenheit', 'celsius']:
             raise ValueError("temperature_unit must be either 'fahrenheit' or 'celsius'")
-    
+
     def setup(self) -> bool:
         """
         Setup the skill - validates API key is available.
-        
+
         Returns:
             True if setup successful
         """
         # API key validation already done in _validate_config
         return True
-    
+
     def register_tools(self) -> None:
         """Register SWAIG tools with the agent"""
         tools = self.get_tools()
@@ -121,11 +121,11 @@ class WeatherApiSkill(SkillBase):
             if self.swaig_fields:
                 tool.update(self.swaig_fields)
             self.agent.register_swaig_function(tool)
-    
+
     def get_tools(self) -> List[Dict[str, Any]]:
         """
         Generate the SWAIG tool with DataMap webhook.
-        
+
         Returns:
             List containing the generated tool configuration
         """
@@ -138,7 +138,7 @@ class WeatherApiSkill(SkillBase):
             temp_field = 'temp_c'
             feels_like_field = 'feelslike_c'
             unit_name = 'Celsius'
-        
+
         # Create TTS-friendly response instruction
         response_instruction = (
             f"Tell the user the current weather conditions. "
@@ -148,7 +148,7 @@ class WeatherApiSkill(SkillBase):
             f"Include the condition, current temperature, wind direction and speed, "
             f"cloud coverage percentage, and what the temperature feels like."
         )
-        
+
         # Build the weather data template
         weather_template = (
             f"{response_instruction} "
@@ -158,7 +158,7 @@ class WeatherApiSkill(SkillBase):
             f"Cloud coverage: ${{current.cloud}} percent. "
             f"Feels like: ${{current.{feels_like_field}}} degrees {unit_name}."
         )
-        
+
         # Create the tool configuration with DataMap webhook
         tool = {
             "function": self.tool_name,
@@ -187,5 +187,5 @@ class WeatherApiSkill(SkillBase):
                 ).to_dict()
             }
         }
-        
-        return [tool] 
+
+        return [tool]

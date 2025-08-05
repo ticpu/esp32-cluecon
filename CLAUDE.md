@@ -7,67 +7,58 @@
 * To reset ESP32: use `mpremote reset` (not `mpremote exec "from machine import reset; reset()"`)
 * To get WiFi info: use `mpremote exec "get_wifi()"`
 
-## SignalWire Integration
+## ESP32 Sentiment Monitor
 
-This project integrates ESP32 with SignalWire's AI Gateway (SWAIG) and SignalWire Markup Language (SWML) for voice-enabled AI applications.
+This ESP32 project implements a real-time sentiment analysis monitor that processes text input via HTTP webhooks and displays emotional intensity through NeoPixel status indicator and LED array.
 
-### ESP32 ↔ SignalWire Data Flow
+### Core Functionality
 
-**What runs on ESP32:**
-- HTTP client for SignalWire API calls
-- Audio capture/playback
-- Local sensor integration
-- WiFi connectivity management
-- Button/input handling
+**Hardware Components:**
+- NeoPixel status indicator (startup/idle/processing/error states)
+- LED array for urgency/anger level display (0-5 scale)
+- PageKite tunnel for remote access
 
-**What runs on SignalWire:**
-- AI model inference
-- Voice-to-text / text-to-voice
-- Call routing and telephony
-- SWML document processing
-- SWAIG function execution
+**Software Features:**
+- HTTP webhook server for receiving text input
+- OpenAI API integration for sentiment analysis using GPT-4.1-nano
+- Rotating word buffer with intelligent processing (250 words max, 50-word trim)
+- Asynchronous processing with timeout-based analysis
+- Status indication through colored NeoPixel feedback
 
-**Communication:**
-- **To SignalWire**: HTTP requests with audio data, sensor readings, status updates
-- **From SignalWire**: SWML responses, audio streams, function calls
-- **Protocol**: REST API over HTTPS
+**API Endpoints:**
+- `POST /webhook` - Receives text input for sentiment analysis
+- `POST /reset` - Clears buffer and resets LEDs (for call disconnect)
+- `GET /` - Returns device status and configuration info
 
-### Key SignalWire Concepts for ESP32
+### Text Processing Flow
 
-**SWAIG Functions**: AI tools that can be called from ESP32:
-```python
-# Example function the ESP32 can trigger
-@AgentBase.tool(name="control_device", description="Control ESP32 device", parameters={...})
-def control_device(self, args, raw_data):
-    # This would run on SignalWire server, responding to ESP32 requests
-    return SwaigFunctionResult("Device controlled")
-```
+1. Text arrives via webhook POST to `/webhook` endpoint
+2. Words added to rotating buffer (deque with 250-word capacity)  
+3. Processing triggered after 2-second timeout since last update
+4. OpenAI sentiment analysis returns urgency/anger level (0-5)
+5. LED array displays intensity level
+6. NeoPixel shows processing status (blue → green/red)
 
-**SWML Responses**: Structured responses that ESP32 can parse:
-- Audio playback instructions
-- Device control commands  
-- Status updates
-- Next action prompts
+### Status Indicator Colors
 
-### ESP32 Integration Patterns
+- **Orange**: Startup/initialization
+- **Green**: Idle/ready state  
+- **Blue**: Processing sentiment analysis
+- **Red**: Error state (API failure, network issues)
 
-**Device Registration**: ESP32 identifies itself to SignalWire service
-**Audio Streaming**: Real-time audio data exchange
-**Command Processing**: Parse SWML responses for device actions
-**State Synchronization**: Keep ESP32 and SignalWire agent in sync
+### PageKite Integration
 
-### Environment Variables (for SignalWire server component)
+The device uses PageKite tunneling for remote webhook access:
+- Automatic tunnel establishment on startup
+- Domain configuration via `config.PAGEKITE_DOMAIN`
+- Status reporting in device info endpoint
 
-**Authentication:**
-- `SWML_BASIC_AUTH_USER` / `SWML_BASIC_AUTH_PASSWORD`: HTTP Basic Auth
+### Configuration
 
-**Configuration:**
-- `SWML_PROXY_URL_BASE`: Reverse proxy setup
-- `SWML_SSL_ENABLED`: Enable HTTPS
-- `SWML_DOMAIN`: Domain configuration
-
-### Deployment Architecture
-
-1. **ESP32 Device**: Runs MicroPython code for hardware interface
-2. **SignalWire Agent**: Cloud-hosted AI agent (Python/FastAPI)
-3. **Communication**: HTTPS REST API between ESP32 and SignalWire
+Key settings in `config.py`:
+- `OPENAI_API_KEY`: API key for sentiment analysis
+- `LED_PINS`: GPIO pins for urgency display LEDs
+- `NEOPIXEL_PIN`: GPIO pin for status indicator
+- `SERVER_PORT`: HTTP server port
+- `CALLBACK_PATH`: Webhook endpoint path
+- `PROCESSING_TIMEOUT`: Delay before processing buffer (2000ms)
