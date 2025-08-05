@@ -7,9 +7,9 @@
 * To reset ESP32: use `mpremote reset` (not `mpremote exec "from machine import reset; reset()"`)
 * To get WiFi info: use `mpremote exec "get_wifi()"`
 
-## ESP32 Sentiment Monitor
+## ESP32 SignalWire AI Device Controller
 
-This ESP32 project implements a real-time sentiment analysis monitor that processes text input via HTTP webhooks and displays emotional intensity through NeoPixel status indicator and LED array.
+This ESP32 project implements a real-time AI-controlled device that integrates with SignalWire AI agents, processes voice conversations, and provides sensor monitoring with visual feedback through NeoPixel status indicator and LED array.
 
 ### Core Functionality
 
@@ -62,3 +62,66 @@ Key settings in `config.py`:
 - `SERVER_PORT`: HTTP server port
 - `CALLBACK_PATH`: Webhook endpoint path
 - `PROCESSING_TIMEOUT`: Delay before processing buffer (2000ms)
+
+### Code Style Guidelines
+
+**IMPORTANT: Always use builder classes instead of manual JSON construction**
+
+✅ **Correct approach using builders:**
+```python
+# SWML document generation
+from swml_builder import SWMLBuilder
+
+builder = (SWMLBuilder()
+          .answer()
+          .ai(model="gpt-4o-mini", temperature=0.7)
+          .add_language("English", "en-US", "openai.alloy")
+          .set_prompt("Your AI prompt here"))
+return builder.build()
+
+# SWAIG function definitions
+from swml_builder import SWAIGFunctionBuilder
+
+function = (SWAIGFunctionBuilder("function_name")
+           .description("Function description")
+           .url("https://example.com/webhook")
+           .add_parameter("param", "string", "Parameter description", required=True)
+           .build())
+
+# SWAIG function responses
+from swaig_function_result import SwaigFunctionResult
+
+return (SwaigFunctionResult("Response text")
+        .update_global_data({"key": "value"})
+        .add_action("action_name", data)
+        .to_dict())
+```
+
+❌ **Avoid manual JSON construction:**
+```python
+# Don't do this - manual JSON is error-prone and hard to maintain
+return {
+    "version": "1.0.0",
+    "sections": {
+        "main": [{"answer": {}}, {"ai": {...}}]
+    }
+}
+
+# Don't do this - manual function definitions
+return {
+    "function": "name",
+    "description": "desc", 
+    "webhook": {"url": "...", "method": "POST"},
+    "parameters": {...}
+}
+
+# Don't do this - manual response objects
+return {"response": "text", "action": [...]}
+```
+
+**Benefits of using builder classes:**
+- **Type safety**: Catch errors at development time
+- **Method chaining**: Cleaner, more readable code
+- **Validation**: Built-in parameter validation
+- **Consistency**: Ensures correct SignalWire API format
+- **Maintainability**: Easier to update when API changes

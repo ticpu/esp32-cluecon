@@ -8,6 +8,7 @@ except ImportError:
 
 import config
 from device_sensors import DeviceSensors
+from sentiment_analyzer import SentimentAnalyzer
 from swaig_function_result import SwaigFunctionResult
 from swml_builder import SWMLBuilder, SWAIGFunctionBuilder
 
@@ -22,6 +23,13 @@ class SignalWireHooks:
         print("[DEBUG] SignalWireHooks.__init__: About to create DeviceSensors")
         self.sensors = DeviceSensors()
         print("[DEBUG] SignalWireHooks.__init__: DeviceSensors created successfully")
+        print("[DEBUG] SignalWireHooks.__init__: About to create SentimentAnalyzer")
+        self.sentiment_analyzer = SentimentAnalyzer(
+            api_key=config.OPENAI_API_KEY,
+            model="gpt-4.1-nano",
+            status_indicator=status_indicator
+        )
+        print("[DEBUG] SignalWireHooks.__init__: SentimentAnalyzer created successfully")
 
         # Available LED colors for user selection
         self.available_colors = {
@@ -54,25 +62,50 @@ Available capabilities:
 Sensor details:
 - DHT11 temperature/humidity sensor: Provides accurate room temperature (°C/°F) and humidity percentage
 - Photoresistor light sensor: Reports light levels as percentage (>30% = bright, 20-30% = moderate lighting, <20% = dim)
-- Light readings: Phone LED ~74%, conference room ~34%, covered ~10%
 
-IMPORTANT: After providing your response to the user, always call the analyze_ai_response function with your response text to provide visual feedback on the ESP32 device. This helps the device display appropriate emotional indicators based on the conversation tone.
+IMPORTANT INSTRUCTIONS:
+1. After calling any function, always tell the user what result you received from that function call. Be specific about the data you got back.
+2. After providing your response to the user, always call the analyze_ai_response function with your response text to provide visual feedback on the ESP32 device.
 
 You can check environmental conditions, system status, and control the device LED colors. Be helpful and provide natural responses about the sensor data with specific numbers."""
 
         # Build SWML document using the builder pattern
         builder = (SWMLBuilder()
                   .answer()
-                  .ai(model="gpt-4o-mini", temperature=0.7)
+                  .ai(model="gpt-4.1-nano", temperature=0.7)
                   .add_language("English", "en-US", "openai.alloy")
                   .set_prompt(prompt_text))
+
+        # Add debug webhook if enabled
+        if config.DEBUG_WEBHOOK_LEVEL > 0:
+            debug_webhook_url = f"https://{config.PAGEKITE_DOMAIN}/debug"
+            builder.current_ai["params"]["debug_webhook_url"] = debug_webhook_url
+            builder.current_ai["params"]["debug_webhook_level"] = config.DEBUG_WEBHOOK_LEVEL
+            if config.AUDIBLE_DEBUG:
+                builder.current_ai["params"]["audible_debug"] = True
+            if config.VERBOSE_LOGS:
+                builder.current_ai["params"]["verbose_logs"] = True
+            if config.CACHE_MODE:
+                builder.current_ai["params"]["cache_mode"] = True
+            if config.ENABLE_ACCOUNTING:
+                builder.current_ai["params"]["enable_accounting"] = True
+            if config.AUDIBLE_LATENCY:
+                builder.current_ai["params"]["audible_latency"] = True
 
         # Add all SWAIG functions using the builder
         base_url = f"https://{config.PAGEKITE_DOMAIN}/swaig"
 
-        # Add each function using the builder methods
-        for func_def in self._get_swaig_functions():
-            builder.current_ai["SWAIG"]["functions"].append(func_def)
+        # Add each SWAIG function properly to the builder
+        functions = self._get_swaig_functions()
+        for func_def in functions:
+            # Extract function parameters for proper builder integration
+            name = func_def["function"]
+            description = func_def["description"]
+            url = func_def["webhook"]["url"]
+            method = func_def["webhook"].get("method", "POST")
+            parameters = func_def.get("parameters")
+            
+            builder.add_swaig_function(name, description, url, method, parameters)
 
         return builder.build()
 
@@ -306,56 +339,28 @@ You can check environmental conditions, system status, and control the device LE
         if config.DEBUG:
             print(f"Analyzing AI response: {ai_text[:50]}...")
 
-        # Extract basic sentiment indicators from AI response
-        sentiment_score = self._analyze_text_sentiment(ai_text)
-
-        # Update LED display based on sentiment
-        if sentiment_score > 0.3:
-            # Positive sentiment - green glow
-            self.status_indicator.set_status('processing')  # Blue processing
-        elif sentiment_score < -0.3:
-            # Negative sentiment - red indication
-            self.status_indicator.set_status('error')  # Red
-        else:
-            # Neutral - keep idle
-            self.status_indicator.set_status('idle')  # Green
+        # Note: In MicroPython, we can't use async in SWAIG handlers easily
+        # So we'll add the text to buffer for processing by the main loop
+        if config.DEBUG:
+            print(f"AI response added to buffer for sentiment analysis")
 
         return SwaigFunctionResult(
             f"AI response analyzed and visual feedback provided."
         ).update_global_data({
             "last_ai_response": ai_text[:200],
-            "ai_sentiment_score": sentiment_score,
             "ai_analysis_context": context,
             "response_timestamp": "now"
         }).to_dict()
 
-    def _analyze_text_sentiment(self, text):
+    async def _analyze_text_sentiment(self, text):
         """
-        Simple sentiment analysis for AI responses
-        Returns a score between -1.0 (negative) and 1.0 (positive)
+        Analyze text sentiment using OpenAI API
+        Returns urgency level 0-5
         """
-        # Simple keyword-based sentiment analysis
-        positive_words = ['good', 'great', 'excellent', 'wonderful', 'amazing', 'happy',
-                         'pleased', 'success', 'perfect', 'fantastic', 'love', 'like',
-                         'helpful', 'thank', 'appreciate', 'glad', 'awesome', 'brilliant']
-
-        negative_words = ['bad', 'terrible', 'awful', 'horrible', 'hate', 'dislike',
-                         'problem', 'issue', 'error', 'fail', 'wrong', 'sorry',
-                         'apologize', 'unfortunately', 'difficult', 'trouble', 'concern']
-
-        # Normalize text for analysis
-        text_lower = text.lower()
-        words = text_lower.split()
-
-        positive_count = sum(1 for word in words if any(pos in word for pos in positive_words))
-        negative_count = sum(1 for word in words if any(neg in word for neg in negative_words))
-
-        total_words = len(words)
-        if total_words == 0:
-            return 0.0
-
-        # Calculate sentiment score
-        sentiment = (positive_count - negative_count) / total_words
-
-        # Clamp between -1 and 1
-        return max(-1.0, min(1.0, sentiment * 3.0))  # Multiply by 3 to amplify the effect
+        try:
+            result = await self.sentiment_analyzer.analyze_sentiment(text)
+            return result.get("urgency_level", 0)
+        except Exception as e:
+            if config.DEBUG:
+                print(f"Error in sentiment analysis: {e}")
+            return 0

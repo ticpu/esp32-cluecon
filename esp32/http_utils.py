@@ -145,6 +145,45 @@ class HTTPRequestHandler:
     def __init__(self, webhook_server):
         self.webhook_server = webhook_server
 
+    def _log_debug_webhook(self, debug_data):
+        """Log debug webhook data to serial output based on debug level"""
+        import config
+        
+        if config.DEBUG_WEBHOOK_LEVEL == 0:
+            return
+        
+        try:
+            if config.DEBUG_WEBHOOK_LEVEL >= 1:
+                # Basic info
+                print(f"SW_DEBUG: Event={debug_data.get('event_type', 'unknown')}, Call={debug_data.get('call_id', 'unknown')}")
+                
+                # AI interaction data
+                if 'ai_data' in debug_data:
+                    ai_data = debug_data['ai_data']
+                    print(f"SW_DEBUG: AI_Model={ai_data.get('model', 'unknown')}")
+                    if 'user_input' in ai_data:
+                        print(f"SW_DEBUG: User_Input={ai_data['user_input'][:100]}...")
+                    if 'ai_response' in ai_data:
+                        print(f"SW_DEBUG: AI_Response={ai_data['ai_response'][:100]}...")
+                        
+                # SWAIG function calls
+                if 'swaig_function' in debug_data:
+                    swaig = debug_data['swaig_function']
+                    print(f"SW_DEBUG: SWAIG_Function={swaig.get('name', 'unknown')}, Args={swaig.get('arguments', {})}")
+                    
+            if config.DEBUG_WEBHOOK_LEVEL >= 2:
+                # Verbose info - full JSON dump
+                try:
+                    import ujson as json
+                except ImportError:
+                    import json
+                print(f"SW_DEBUG_FULL: {json.dumps(debug_data)}")
+                
+        except Exception as e:
+            # If there's any error processing the debug data, output raw data
+            print(f"SW_DEBUG_ERROR: {e}")
+            print(f"SW_DEBUG_RAW: {debug_data}")
+
     async def handle_http_request(self, method, path, body):
         """
         Handle HTTP request and return response string
@@ -206,6 +245,18 @@ class HTTPRequestHandler:
                         print(f"SWAIG function error: {e}")
                     error_response = {"response": f"Error: {str(e)}"}
                     return HTTPResponse.json_response(500, error_response)
+
+            # Handle debug webhook from SignalWire
+            elif method == "POST" and path == "/debug":
+                try:
+                    if body and config.DEBUG_WEBHOOK_LEVEL > 0:
+                        debug_data = json.loads(body)
+                        self._log_debug_webhook(debug_data)
+                    return HTTPResponse.text_response(200, "OK")
+                except Exception as e:
+                    if config.DEBUG:
+                        print(f"Debug webhook error: {e}")
+                    return HTTPResponse.text_response(500, f"Debug webhook failed: {e}")
 
             # Handle buffer reset (for call disconnect)
             elif method == "POST" and path == config.RESET_PATH:
