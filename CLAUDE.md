@@ -2,7 +2,10 @@
 * This is a ESP32 MicroPython project.
 * Files are located in the `esp32/` subfolder.
 * To deploy, cd to esp32/ and use `./deploy.sh -r main.py boot.py file.py` this will upload those 3 files and restart (-r).
+* To install packages, use `./deploy.sh -p` to install from requirements.txt
 * To change WiFi, cd to esp32/ and use `./generate_boot.py SSID PSK webrepl_password` and `./deploy.sh -r boot.py`
+* To reset ESP32: use `mpremote reset` (not `mpremote exec "from machine import reset; reset()"`)
+* To get WiFi info: use `mpremote exec "get_wifi()"`
 
 ## SignalWire Integration
 

@@ -1,0 +1,13 @@
+# MicroPython packages for ESP32
+# Install with: mpremote mip install <package>
+
+# HTTP client for API requests
+urequests
+
+# Optional: Additional networking utilities
+# umqtt.simple
+# uasyncio
+
+# Note: upagekite and ujson are built-in or not available via mip
+# ujson is built-in to MicroPython
+# upagekite needs manual installation from GitHub
