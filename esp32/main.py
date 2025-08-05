@@ -74,7 +74,7 @@ class WordBuffer:
 
     def should_process(self, timeout_ms=2000):
         """Check if we should process (2 seconds since last update AND new words)"""
-        return (time.ticks_diff(time.ticks_ms(), self.last_update) >= timeout_ms and 
+        return (time.ticks_diff(time.ticks_ms(), self.last_update) >= timeout_ms and
                 len(self.buffer) > self.processed_count)
 
     def clear(self):
@@ -82,7 +82,7 @@ class WordBuffer:
         while self.buffer:
             self.buffer.popleft()
         self.processed_count = 0
-    
+
     def mark_processed(self):
         """Mark current buffer contents as processed"""
         self.processed_count = len(self.buffer)
@@ -193,6 +193,7 @@ class WebhookServer:
                 return
 
             method, path = parts[0], parts[1]
+            print(f"HTTP REQUEST: {method} {path}")
 
             # Handle webhook POST
             if method == "POST" and path == config.CALLBACK_PATH:
@@ -223,24 +224,24 @@ class WebhookServer:
                         body = request_str.split("\r\n\r\n", 1)[1]
                     elif "\n\n" in request_str:
                         body = request_str.split("\n\n", 1)[1]
-                    
+
                     swaig_data = {}
                     if body:
                         swaig_data = json.loads(body)
-                    
+
                     function_name = path.split("/")[-1]  # Extract function name from path
                     args = swaig_data.get("argument", {})
                     raw_data = swaig_data
-                    
+
                     # Use SignalWire hooks module to handle the function call
                     response_data = self.signalwire_hooks.handle_swaig_function(function_name, args, raw_data)
-                    
+
                     # Start processing task if text was added to buffer
                     if function_name == "process_text" and not self.processing:
                         asyncio.create_task(self.process_buffer())
-                    
+
                     await self.send_response(writer, 200, json.dumps(response_data), "application/json")
-                    
+
                 except Exception as e:
                     if config.DEBUG:
                         print(f"SWAIG function error: {e}")
@@ -261,67 +262,22 @@ class WebhookServer:
 
             else:
                 # Handle other requests
-                if path == "/":
-                    # Return SWML document for SignalWire
-                    swml_doc = {
-                        "version": "1.0.0",
-                        "sections": {
-                            "main": [
-                                {
-                                    "ai": {
-                                        "post_prompt_url": f"https://{config.PAGEKITE_DOMAIN}/swaig/hangup_hook",
-                                        "post_prompt": "Summarize the conversation and sentiment analysis results.",
-                                        "params": {
-                                            "model": "gpt-4o-mini",
-                                            "temperature": 0.7
-                                        },
-                                        "SWAIG": {
-                                            "functions": [
-                                                {
-                                                    "function": "startup_hook",
-                                                    "purpose": "Initialize ESP32 for new call session",
-                                                    "webhook": {
-                                                        "url": f"https://{config.PAGEKITE_DOMAIN}/swaig/startup_hook",
-                                                        "method": "POST"
-                                                    }
-                                                },
-                                                {
-                                                    "function": "get_temperature",
-                                                    "purpose": "Get current temperature from ESP32 device",
-                                                    "webhook": {
-                                                        "url": f"https://{config.PAGEKITE_DOMAIN}/swaig/get_temperature",
-                                                        "method": "POST"
-                                                    }
-                                                },
-                                                {
-                                                    "function": "process_text",
-                                                    "purpose": "Send text to ESP32 for real-time sentiment analysis",
-                                                    "argument": {
-                                                        "properties": {
-                                                            "text": {
-                                                                "type": "string",
-                                                                "description": "Text content to analyze for sentiment"
-                                                            }
-                                                        },
-                                                        "required": ["text"]
-                                                    },
-                                                    "webhook": {
-                                                        "url": f"https://{config.PAGEKITE_DOMAIN}/swaig/process_text",
-                                                        "method": "POST"
-                                                    }
-                                                }
-                                            ]
-                                        },
-                                        "prompt": "You are connected to an ESP32 sentiment monitor device. You can check the temperature and send text for real-time sentiment analysis. The device displays emotional intensity through LEDs and status indicators. Feel free to use the available functions to interact with the hardware."
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                    # Return SWML document for SignalWire (supports both GET and POST)
-                    swml_doc = self.signalwire_hooks.get_swml_document()
-                    await self.send_response(writer, 200, json.dumps(swml_doc), "application/json")
+                if path == "/" or path == "/swml":
+                    if config.DEBUG:
+                        print(f"SWML request: {method} {path}")
+                    try:
+                        # Return SWML document for SignalWire (supports both GET and POST)
+                        swml_doc = self.signalwire_hooks.get_swml_document()
+                        if config.DEBUG:
+                            print(f"SWML doc generated, size: {len(json.dumps(swml_doc))}")
+                        await self.send_response(writer, 200, json.dumps(swml_doc), "application/json")
+                    except Exception as e:
+                        if config.DEBUG:
+                            print(f"SWML generation error: {e}")
+                        await self.send_response(writer, 500, f"SWML Error: {str(e)}")
                 else:
+                    if config.DEBUG:
+                        print(f"404 for: {method} {path}")
                     await self.send_response(writer, 404, "Not Found")
 
         except Exception as e:

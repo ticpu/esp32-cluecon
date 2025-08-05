@@ -257,19 +257,45 @@ class PageKiteHandler(uPageKiteDefaults):
                 response = "HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nRESET\n"
                 await conn.reply(frame, response, eof=True)
                 
-            elif method == "GET" and path == "/":
-                # Status endpoint
-                status_data = {
-                    "status": "active",
-                    "device": config.DEVICE_NAME,
-                    "buffer_size": len(self.webhook_server.word_buffer.buffer),
-                    "webhook_path": config.CALLBACK_PATH,
-                    "reset_path": config.RESET_PATH,
-                    "pagekite_running": True
-                }
-                body = json.dumps(status_data)
-                response = f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {len(body)}\r\n\r\n{body}"
-                await conn.reply(frame, response, eof=True)
+            elif method == "POST" and path.startswith("/swaig/"):
+                # Handle SignalWire SWAIG function calls
+                try:
+                    swaig_data = {}
+                    if content:
+                        swaig_data = json.loads(content)
+                    
+                    function_name = path.split("/")[-1]  # Extract function name from path
+                    args = swaig_data.get("argument", {})
+                    raw_data = swaig_data
+                    
+                    # Use SignalWire hooks module to handle the function call
+                    response_data = self.webhook_server.signalwire_hooks.handle_swaig_function(function_name, args, raw_data)
+                    
+                    body = json.dumps(response_data)
+                    body_bytes = body.encode('utf-8')
+                    response = f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {len(body_bytes)}\r\n\r\n{body}"
+                    await conn.reply(frame, response, eof=True)
+                    
+                except Exception as e:
+                    self.error(f'SWAIG function error: {e}')
+                    error_response = {"response": f"Error: {str(e)}"}
+                    body = json.dumps(error_response)
+                    body_bytes = body.encode('utf-8')
+                    response = f"HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\nContent-Length: {len(body_bytes)}\r\n\r\n{body}"
+                    await conn.reply(frame, response, eof=True)
+
+            elif path == "/" or path == "/swml":
+                # Return SWML document for SignalWire (supports both GET and POST)
+                try:
+                    swml_doc = self.webhook_server.signalwire_hooks.get_swml_document()
+                    body = json.dumps(swml_doc)
+                    body_bytes = body.encode('utf-8')
+                    response = f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {len(body_bytes)}\r\n\r\n{body}"
+                    await conn.reply(frame, response, eof=True)
+                except Exception as e:
+                    self.error(f'SWML generation error: {e}')
+                    response = f"HTTP/1.1 500 Internal Server Error\r\nContent-Length: 21\r\n\r\nSWML generation error"
+                    await conn.reply(frame, response, eof=True)
                 
             else:
                 response = "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nNot Found"

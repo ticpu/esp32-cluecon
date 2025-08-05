@@ -40,17 +40,14 @@ class SignalWireHooks:
             "sections": {
                 "main": [
                     {
+                        "answer": {}
+                    },
+                    {
                         "ai": {
-                            "post_prompt_url": f"https://{config.PAGEKITE_DOMAIN}/swaig/hangup_hook",
-                            "post_prompt": "Summarize the conversation and any sensor readings or device interactions.",
-                            "params": {
-                                "model": "gpt-4o-mini",
-                                "temperature": 0.7
-                            },
-                            "SWAIG": {
-                                "functions": self._get_swaig_functions()
-                            },
-                            "prompt": f"""You are connected to an ESP32 device called '{config.DEVICE_NAME}' for real-time monitoring and control.
+                            "prompt": {
+                                "text": f"""You are connected to an ESP32 device called '{config.DEVICE_NAME}' for real-time monitoring and control.
+
+Start the conversation by greeting the user and explaining you can monitor room sensors, check system status, and control the LED. Then ask what they'd like to know.
 
 Available capabilities:
 - Monitor room temperature, humidity, and light levels using real sensors
@@ -63,7 +60,18 @@ Sensor details:
 - Photoresistor light sensor: Reports light levels as percentage (>30% = bright, 20-30% = moderate lighting, <20% = dim)
 - Light readings: Phone LED ~74%, conference room ~34%, covered ~10%
 
-You can check environmental conditions, system status, and control the device LED colors. Be helpful and provide natural responses about the sensor data with specific numbers."""
+You can check environmental conditions, system status, and control the device LED colors. Be helpful and provide natural responses about the sensor data with specific numbers.""",
+                                "temperature": 0.7,
+                                "max_tokens": 256
+                            },
+                            "post_prompt": "Summarize the conversation and any sensor readings or device interactions.",
+                            "post_prompt_url": f"https://{config.PAGEKITE_DOMAIN}/swaig/hangup_hook",
+                            "params": {
+                                "model": "gpt-4o-mini"
+                            },
+                            "SWAIG": {
+                                "functions": self._get_swaig_functions()
+                            }
                         }
                     }
                 ]
