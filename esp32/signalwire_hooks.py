@@ -8,16 +8,21 @@ except ImportError:
 
 import config
 from device_sensors import DeviceSensors
+from swaig_function_result import SwaigFunctionResult
+from swml_builder import SWMLBuilder, SWAIGFunctionBuilder
 
 class SignalWireHooks:
     """Manages SignalWire SWAIG functions and SWML integration"""
-    
+
     def __init__(self, status_indicator, led_controller, word_buffer):
+        print("[DEBUG] SignalWireHooks.__init__: Starting initialization")
         self.status_indicator = status_indicator
         self.led_controller = led_controller
         self.word_buffer = word_buffer
+        print("[DEBUG] SignalWireHooks.__init__: About to create DeviceSensors")
         self.sensors = DeviceSensors()
-        
+        print("[DEBUG] SignalWireHooks.__init__: DeviceSensors created successfully")
+
         # Available LED colors for user selection
         self.available_colors = {
             "red": (102, 0, 0),
@@ -32,30 +37,10 @@ class SignalWireHooks:
             "lime": (51, 102, 0),
             "off": (0, 0, 0)
         }
-    
+
     def get_swml_document(self):
-        """Generate the SWML document with all available SWAIG functions"""
-        return {
-            "version": "1.0.0",
-            "sections": {
-                "main": [
-                    {
-                        "answer": {}
-                    },
-                    {
-                        "ai": {
-                            "languages": [
-                                {
-                                    "name": "English",
-                                    "code": "en-US",
-                                    "voice": "openai.alloy"
-                                }
-                            ],
-                            "params": {
-                                "ai_model": "gpt-4o-mini"
-                            },
-                            "prompt": {
-                                "text": f"""You are connected to an ESP32 device called '{config.DEVICE_NAME}' for real-time monitoring and control.
+        """Generate the SWML document with all available SWAIG functions using SWMLBuilder"""
+        prompt_text = f"""You are connected to an ESP32 device called '{config.DEVICE_NAME}' for real-time monitoring and control.
 
 Start the conversation by greeting the user and explaining you can monitor room sensors, check system status, and control the LED. Then ask what they'd like to know.
 
@@ -64,121 +49,107 @@ Available capabilities:
 - Get ESP32 system information (uptime, core temperature, memory)
 - Control status LED with various colors
 - Real-time sentiment analysis of conversation text
+- Visual feedback through LED display based on conversation emotion
 
 Sensor details:
 - DHT11 temperature/humidity sensor: Provides accurate room temperature (°C/°F) and humidity percentage
 - Photoresistor light sensor: Reports light levels as percentage (>30% = bright, 20-30% = moderate lighting, <20% = dim)
 - Light readings: Phone LED ~74%, conference room ~34%, covered ~10%
 
-You can check environmental conditions, system status, and control the device LED colors. Be helpful and provide natural responses about the sensor data with specific numbers.""",
-                                "temperature": 0.7
-                            },
-                            "SWAIG": {
-                                "functions": self._get_swaig_functions()
-                            }
-                        }
-                    }
-                ]
-            }
-        }
-    
+IMPORTANT: After providing your response to the user, always call the analyze_ai_response function with your response text to provide visual feedback on the ESP32 device. This helps the device display appropriate emotional indicators based on the conversation tone.
+
+You can check environmental conditions, system status, and control the device LED colors. Be helpful and provide natural responses about the sensor data with specific numbers."""
+
+        # Build SWML document using the builder pattern
+        builder = (SWMLBuilder()
+                  .answer()
+                  .ai(model="gpt-4o-mini", temperature=0.7)
+                  .add_language("English", "en-US", "openai.alloy")
+                  .set_prompt(prompt_text))
+
+        # Add all SWAIG functions using the builder
+        base_url = f"https://{config.PAGEKITE_DOMAIN}/swaig"
+
+        # Add each function using the builder methods
+        for func_def in self._get_swaig_functions():
+            builder.current_ai["SWAIG"]["functions"].append(func_def)
+
+        return builder.build()
+
     def _get_swaig_functions(self):
         """Get all SWAIG function definitions following the skill pattern"""
         base_url = f"https://{config.PAGEKITE_DOMAIN}/swaig"
-        
-        return [
-            {
-                "function": "startup_hook",
-                "description": "Initialize ESP32 for new call session",
-                "webhook": {
-                    "url": f"{base_url}/startup_hook",
-                    "method": "POST"
-                },
-                "parameters": {
-                    "type": "object",
-                    "properties": {}
-                }
-            },
-            {
-                "function": "hangup_hook", 
-                "description": "Clean up ESP32 state after call ends",
-                "webhook": {
-                    "url": f"{base_url}/hangup_hook",
-                    "method": "POST"
-                },
-                "parameters": {
-                    "type": "object",
-                    "properties": {}
-                }
-            },
-            {
-                "function": "get_room_weather",
-                "description": "Get comprehensive room environmental data including temperature, humidity, light level, and conditions",
-                "webhook": {
-                    "url": f"{base_url}/get_room_weather",
-                    "method": "POST"
-                },
-                "parameters": {
-                    "type": "object",
-                    "properties": {}
-                }
-            },
-            {
-                "function": "get_system_info",
-                "description": "Get ESP32 system information including uptime, core temperature, and memory usage",
-                "webhook": {
-                    "url": f"{base_url}/get_system_info", 
-                    "method": "POST"
-                },
-                "parameters": {
-                    "type": "object",
-                    "properties": {}
-                }
-            },
-            {
-                "function": "set_status_led",
-                "description": f"Control the status LED color. Available colors: {', '.join(self.available_colors.keys())}",
-                "webhook": {
-                    "url": f"{base_url}/set_status_led",
-                    "method": "POST"
-                },
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "color": {
-                            "type": "string",
-                            "description": f"LED color to set. Options: {', '.join(self.available_colors.keys())}",
-                            "enum": list(self.available_colors.keys())
-                        }
-                    },
-                    "required": ["color"]
-                }
-            },
-            {
-                "function": "process_text",
-                "description": "Send text to ESP32 for real-time sentiment analysis",
-                "webhook": {
-                    "url": f"{base_url}/process_text",
-                    "method": "POST"
-                },
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "text": {
-                            "type": "string",
-                            "description": "Text content to analyze for sentiment"
-                        }
-                    },
-                    "required": ["text"]
-                }
-            }
-        ]
-    
+
+        functions = []
+
+        # Startup hook function
+        functions.append(
+            SWAIGFunctionBuilder("startup_hook")
+            .description("Initialize ESP32 for new call session")
+            .url(f"{base_url}/startup_hook")
+            .build()
+        )
+
+        # Hangup hook function
+        functions.append(
+            SWAIGFunctionBuilder("hangup_hook")
+            .description("Clean up ESP32 state after call ends")
+            .url(f"{base_url}/hangup_hook")
+            .build()
+        )
+
+        # Room weather function
+        functions.append(
+            SWAIGFunctionBuilder("get_room_weather")
+            .description("Get comprehensive room environmental data including temperature, humidity, light level, and conditions")
+            .url(f"{base_url}/get_room_weather")
+            .build()
+        )
+
+        # System info function
+        functions.append(
+            SWAIGFunctionBuilder("get_system_info")
+            .description("Get ESP32 system information including uptime, core temperature, and memory usage")
+            .url(f"{base_url}/get_system_info")
+            .build()
+        )
+
+        # Status LED function
+        functions.append(
+            SWAIGFunctionBuilder("set_status_led")
+            .description("Control the status LED color")
+            .url(f"{base_url}/set_status_led")
+            .add_parameter("color", "string", "LED color to set",
+                         required=True, enum_values=list(self.available_colors.keys()))
+            .build()
+        )
+
+        # Process text function
+        functions.append(
+            SWAIGFunctionBuilder("process_text")
+            .description("Send text to ESP32 for real-time sentiment analysis")
+            .url(f"{base_url}/process_text")
+            .add_parameter("text", "string", "Text content to analyze for sentiment", required=True)
+            .build()
+        )
+
+        # AI response analysis function
+        functions.append(
+            SWAIGFunctionBuilder("analyze_ai_response")
+            .description("Analyze AI response text for sentiment and emotional content to provide visual feedback")
+            .url(f"{base_url}/analyze_ai_response")
+            .add_parameter("ai_text", "string", "AI response text to analyze for sentiment and emotion", required=True)
+            .add_parameter("context", "string", "Optional context about the conversation or situation")
+            .build()
+        )
+
+        return functions
+
     def handle_swaig_function(self, function_name, args, raw_data):
         """Handle SWAIG function calls and return appropriate responses"""
         if config.DEBUG:
             print(f"SWAIG function called: {function_name}")
-        
+
         try:
             if function_name == "startup_hook":
                 return self._handle_startup_hook(args, raw_data)
@@ -192,120 +163,199 @@ You can check environmental conditions, system status, and control the device LE
                 return self._handle_set_status_led(args, raw_data)
             elif function_name == "process_text":
                 return self._handle_process_text(args, raw_data)
+            elif function_name == "analyze_ai_response":
+                return self._handle_analyze_ai_response(args, raw_data)
             else:
-                return {"response": f"Unknown function: {function_name}"}
-                
+                return SwaigFunctionResult(f"Unknown function: {function_name}").to_dict()
+
         except Exception as e:
             if config.DEBUG:
                 print(f"Error in {function_name}: {e}")
-            return {"response": f"Error executing {function_name}: {str(e)}"}
-    
+            return SwaigFunctionResult(f"Error executing {function_name}: {str(e)}").to_dict()
+
     def _handle_startup_hook(self, args, raw_data):
         """Handle call startup - reset device state"""
         call_id = raw_data.get("call_id", "unknown")
         if config.DEBUG:
             print(f"SignalWire call started: {call_id}")
-        
+
         # Reset state for new call
         self.word_buffer.clear()
         self.led_controller.clear_all()
         self.status_indicator.set_status('idle')
-        
-        return {
-            "response": f"ESP32 device '{config.DEVICE_NAME}' is ready and initialized for the call."
-        }
-    
+
+        return SwaigFunctionResult(
+            f"ESP32 device '{config.DEVICE_NAME}' is ready and initialized for the call."
+        ).update_global_data({
+            "device_name": config.DEVICE_NAME,
+            "call_state": "active"
+        }).to_dict()
+
     def _handle_hangup_hook(self, args, raw_data):
         """Handle call hangup - cleanup device state"""
         call_id = raw_data.get("call_id", "unknown")
         if config.DEBUG:
             print(f"SignalWire call ended: {call_id}")
-        
+
         # Clear state after call
         self.word_buffer.clear()
         self.led_controller.clear_all()
         self.status_indicator.set_status('idle')
-        
-        return {
-            "response": f"Call ended. ESP32 device '{config.DEVICE_NAME}' has been reset and is ready for the next session."
-        }
-    
+
+        return SwaigFunctionResult(
+            f"Call ended. ESP32 device '{config.DEVICE_NAME}' has been reset and is ready for the next session."
+        ).update_global_data({
+            "call_state": "idle",
+            "last_call_ended": "now"
+        }).to_dict()
+
     def _handle_get_room_weather(self, args, raw_data):
         """Handle room weather request"""
         weather_data = self.sensors.get_room_weather()
-        
+
         if config.DEBUG:
             print(f"Room weather requested: {weather_data['summary']}")
-        
-        return {
-            "response": weather_data["summary"],
-            "data": weather_data
-        }
-    
+
+        return SwaigFunctionResult(weather_data["summary"]).update_global_data({
+            "last_sensor_reading": weather_data,
+            "sensor_timestamp": "now"
+        }).to_dict()
+
     def _handle_get_system_info(self, args, raw_data):
         """Handle system info request"""
         uptime_data = self.sensors.get_uptime()
         core_temp = self.sensors.get_core_temperature()
         memory_data = self.sensors.get_memory_info()
-        
+
         response_text = (
             f"ESP32 system status: "
             f"Uptime {uptime_data['formatted']}, "
             f"core temperature {core_temp['celsius']}°C ({core_temp['fahrenheit']}°F), "
             f"memory usage {memory_data['used_percent']}% with {memory_data['free_bytes']} bytes free."
         )
-        
+
         if config.DEBUG:
             print(f"System info requested: {response_text}")
-        
-        return {
-            "response": response_text,
-            "data": {
+
+        return SwaigFunctionResult(response_text).update_global_data({
+            "system_info": {
                 "uptime": uptime_data,
                 "core_temperature": core_temp,
                 "memory": memory_data,
                 "device": config.DEVICE_NAME
-            }
-        }
-    
+            },
+            "last_system_check": "now"
+        }).to_dict()
+
     def _handle_set_status_led(self, args, raw_data):
         """Handle status LED color change"""
         color_name = args.get("color", "").lower()
-        
+
         if color_name not in self.available_colors:
             available = ", ".join(self.available_colors.keys())
-            return {
-                "response": f"Invalid color '{color_name}'. Available colors are: {available}"
-            }
-        
+            return SwaigFunctionResult(
+                f"Invalid color '{color_name}'. Available colors are: {available}"
+            ).to_dict()
+
         # Set the LED color
         color_rgb = self.available_colors[color_name]
         self.status_indicator.np[0] = color_rgb
         self.status_indicator.np.write()
-        
+
         if config.DEBUG:
             print(f"Status LED set to {color_name}: {color_rgb}")
-        
-        return {
-            "response": f"Status LED has been set to {color_name}.",
-            "data": {
+
+        return SwaigFunctionResult(
+            f"Status LED has been set to {color_name}."
+        ).update_global_data({
+            "led_status": {
                 "color": color_name,
                 "rgb": color_rgb
-            }
-        }
-    
+            },
+            "last_led_change": "now"
+        }).to_dict()
+
     def _handle_process_text(self, args, raw_data):
         """Handle real-time text processing for sentiment analysis"""
         text = args.get("text", "")
-        
+
         if text:
             self.word_buffer.add_words(text)
             if config.DEBUG:
                 print(f"Added text via SWAIG: {text[:50]}...")
-            return {
-                "response": f"Text processed for sentiment analysis: '{text[:50]}{'...' if len(text) > 50 else ''}'"
-            }
+            return SwaigFunctionResult(
+                f"Text processed for analysis: '{text[:50]}{'...' if len(text) > 50 else ''}'"
+            ).update_global_data({
+                "last_text_processed": text[:100],
+                "text_buffer_size": len(self.word_buffer.words)
+            }).to_dict()
         else:
-            return {
-                "response": "No text provided for processing."
-            }
+            return SwaigFunctionResult("No text provided for processing.").to_dict()
+
+    def _handle_analyze_ai_response(self, args, raw_data):
+        """Handle AI response analysis for sentiment and emotional feedback"""
+        ai_text = args.get("ai_text", "")
+        context = args.get("context", "")
+
+        if not ai_text:
+            return SwaigFunctionResult("No AI text provided for analysis.").to_dict()
+
+        # Add AI response text to word buffer for sentiment analysis
+        self.word_buffer.add_words(ai_text)
+
+        if config.DEBUG:
+            print(f"Analyzing AI response: {ai_text[:50]}...")
+
+        # Extract basic sentiment indicators from AI response
+        sentiment_score = self._analyze_text_sentiment(ai_text)
+
+        # Update LED display based on sentiment
+        if sentiment_score > 0.3:
+            # Positive sentiment - green glow
+            self.status_indicator.set_status('processing')  # Blue processing
+        elif sentiment_score < -0.3:
+            # Negative sentiment - red indication
+            self.status_indicator.set_status('error')  # Red
+        else:
+            # Neutral - keep idle
+            self.status_indicator.set_status('idle')  # Green
+
+        return SwaigFunctionResult(
+            f"AI response analyzed and visual feedback provided."
+        ).update_global_data({
+            "last_ai_response": ai_text[:200],
+            "ai_sentiment_score": sentiment_score,
+            "ai_analysis_context": context,
+            "response_timestamp": "now"
+        }).to_dict()
+
+    def _analyze_text_sentiment(self, text):
+        """
+        Simple sentiment analysis for AI responses
+        Returns a score between -1.0 (negative) and 1.0 (positive)
+        """
+        # Simple keyword-based sentiment analysis
+        positive_words = ['good', 'great', 'excellent', 'wonderful', 'amazing', 'happy',
+                         'pleased', 'success', 'perfect', 'fantastic', 'love', 'like',
+                         'helpful', 'thank', 'appreciate', 'glad', 'awesome', 'brilliant']
+
+        negative_words = ['bad', 'terrible', 'awful', 'horrible', 'hate', 'dislike',
+                         'problem', 'issue', 'error', 'fail', 'wrong', 'sorry',
+                         'apologize', 'unfortunately', 'difficult', 'trouble', 'concern']
+
+        # Normalize text for analysis
+        text_lower = text.lower()
+        words = text_lower.split()
+
+        positive_count = sum(1 for word in words if any(pos in word for pos in positive_words))
+        negative_count = sum(1 for word in words if any(neg in word for neg in negative_words))
+
+        total_words = len(words)
+        if total_words == 0:
+            return 0.0
+
+        # Calculate sentiment score
+        sentiment = (positive_count - negative_count) / total_words
+
+        # Clamp between -1 and 1
+        return max(-1.0, min(1.0, sentiment * 3.0))  # Multiply by 3 to amplify the effect

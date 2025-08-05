@@ -2,6 +2,7 @@ import gc
 import uasyncio as asyncio
 from upagekite_lib.proto import uPageKiteDefaults, Kite, Frame
 import config
+from http_utils import HTTPResponse, HTTPRequest, HTTPRequestHandler
 try:
     import ujson as json
 except ImportError:
@@ -41,6 +42,8 @@ class PageKiteHandler(uPageKiteDefaults):
         self.global_secret = self.make_random_secret()
         self.running = False
         self.webhook_server = webhook_server
+        # Initialize shared HTTP handler if webhook_server is available
+        self.http_handler = HTTPRequestHandler(webhook_server) if webhook_server else None
 
     @classmethod
     def log(cls, message):
@@ -55,7 +58,7 @@ class PageKiteHandler(uPageKiteDefaults):
             if response.status_code != 200:
                 content = response.text
                 response.close()
-                
+
                 # Look for relay IP in the offline page
                 if 'relay=' in content:
                     relay_part = content.split('relay=')[1].split('"')[0]
@@ -70,7 +73,7 @@ class PageKiteHandler(uPageKiteDefaults):
                 response.close()
         except Exception as e:
             self.info(f'Relay discovery failed: {e}')
-        
+
         return None
 
     async def start_tunnel(self, domain, secret, local_port=80):
@@ -98,7 +101,7 @@ class PageKiteHandler(uPageKiteDefaults):
                 self.info('Could not discover expected relay, using discovery')
                 best_relay = None
                 best_ping = 99999
-                    
+
             if not best_relay or best_ping >= 99999:
                 self.error('Expected relay failed, using discovery')
                 # Fall back to default relay discovery
@@ -113,11 +116,11 @@ class PageKiteHandler(uPageKiteDefaults):
                     if ping < best_ping:
                         best_ping = ping
                         best_relay = addr
-                        
+
                 if not best_relay:
                     self.error('No working PageKite relays found')
                     return False
-                    
+
                 self.info(f'Using fallback relay {best_relay} (ping: {best_ping}ms)')
 
             # Connect to PageKite relay
@@ -193,120 +196,48 @@ class PageKiteHandler(uPageKiteDefaults):
             self.running = False
             if hasattr(conn, 'close'):
                 conn.close()
-    
+
     async def _handle_http_request(self, conn, frame):
-        """Handle HTTP request directly with simple parsing"""
+        """Handle HTTP request using shared handler"""
         try:
             # Only log actual HTTP requests, not connection management
             if frame.payload and len(frame.payload) > 20:
-                self.info(f'HTTP request: frame.sid={frame.sid}, payload_len={len(frame.payload)}')
-            
-            if not frame.payload or not self.webhook_server:
+                self.info(f'PageKite HTTP request: frame.sid={frame.sid}, payload_len={len(frame.payload)}')
+
+            if not frame.payload or not self.http_handler:
                 # Silently handle empty payloads (connection management)
-                await conn.reply(frame, "HTTP/1.1 400 Bad Request\r\n\r\n", eof=True)
+                response = HTTPResponse.text_response(400, "Bad Request")
+                await conn.reply(frame, response, eof=True)
                 return
-                
+
             # Parse HTTP request
             request_str = str(frame.payload, 'utf-8')
-            lines = request_str.split('\n')
-            
-            if not lines:
-                await conn.reply(frame, "HTTP/1.1 400 Bad Request\r\n\r\n", eof=True)
-                return
-                
-            request_line = lines[0].strip()
-            parts = request_line.split(' ')
-            
-            if len(parts) < 2:
-                await conn.reply(frame, "HTTP/1.1 400 Bad Request\r\n\r\n", eof=True)
-                return
-                
-            method, path = parts[0], parts[1]
-            self.info(f'HTTP {method} {path}')
-            
-            # Extract request body if present
-            content = ""
-            if "\r\n\r\n" in request_str:
-                content = request_str.split("\r\n\r\n", 1)[1]
-            elif "\n\n" in request_str:
-                content = request_str.split("\n\n", 1)[1]
-            
-            # Handle different endpoints
-            if method == "POST" and path == config.CALLBACK_PATH:
-                # Webhook endpoint
-                if content:
-                    self.webhook_server.word_buffer.add_words(content)
-                    if config.DEBUG:
-                        print(f"[PageKite] Added words: {content[:50]}...")
-                    
-                    # Start processing if not already running
-                    if not self.webhook_server.processing:
-                        asyncio.create_task(self.webhook_server.process_buffer())
-                
-                response = "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nOK\n"
-                await conn.reply(frame, response, eof=True)
-                
-            elif method == "POST" and path == config.RESET_PATH:
-                # Reset endpoint
-                self.webhook_server.word_buffer.clear()
-                self.webhook_server.led_controller.clear_all()
-                self.webhook_server.status_indicator.set_status('idle')
-                if config.DEBUG:
-                    print("[PageKite] Buffer reset - call disconnected")
-                
-                response = "HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nRESET\n"
-                await conn.reply(frame, response, eof=True)
-                
-            elif method == "POST" and path.startswith("/swaig/"):
-                # Handle SignalWire SWAIG function calls
-                try:
-                    swaig_data = {}
-                    if content:
-                        swaig_data = json.loads(content)
-                    
-                    function_name = path.split("/")[-1]  # Extract function name from path
-                    args = swaig_data.get("argument", {})
-                    raw_data = swaig_data
-                    
-                    # Use SignalWire hooks module to handle the function call
-                    response_data = self.webhook_server.signalwire_hooks.handle_swaig_function(function_name, args, raw_data)
-                    
-                    body = json.dumps(response_data)
-                    body_bytes = body.encode('utf-8')
-                    response = f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {len(body_bytes)}\r\n\r\n{body}"
-                    await conn.reply(frame, response, eof=True)
-                    
-                except Exception as e:
-                    self.error(f'SWAIG function error: {e}')
-                    error_response = {"response": f"Error: {str(e)}"}
-                    body = json.dumps(error_response)
-                    body_bytes = body.encode('utf-8')
-                    response = f"HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\nContent-Length: {len(body_bytes)}\r\n\r\n{body}"
-                    await conn.reply(frame, response, eof=True)
+            parsed_request = HTTPRequest.parse_request(request_str)
 
-            elif path == "/" or path == "/swml":
-                # Return SWML document for SignalWire (supports both GET and POST)
-                try:
-                    swml_doc = self.webhook_server.signalwire_hooks.get_swml_document()
-                    body = json.dumps(swml_doc)
-                    body_bytes = body.encode('utf-8')
-                    response = f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {len(body_bytes)}\r\n\r\n{body}"
-                    await conn.reply(frame, response, eof=True)
-                except Exception as e:
-                    self.error(f'SWML generation error: {e}')
-                    response = f"HTTP/1.1 500 Internal Server Error\r\nContent-Length: 21\r\n\r\nSWML generation error"
-                    await conn.reply(frame, response, eof=True)
-                
-            else:
-                response = "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nNot Found"
+            if not parsed_request:
+                response = HTTPResponse.text_response(400, "Bad Request")
                 await conn.reply(frame, response, eof=True)
-                
+                return
+
+            self.info(f'PageKite HTTP {parsed_request["method"]} {parsed_request["path"]}')
+
+            # Use shared HTTP handler
+            response = await self.http_handler.handle_http_request(
+                parsed_request["method"],
+                parsed_request["path"],
+                parsed_request["body"]
+            )
+
+            await conn.reply(frame, response, eof=True)
+
         except Exception as e:
-            self.error(f'HTTP request handling error: {e}')
+            self.error(f'PageKite HTTP request handling error: {e}')
             if self.debug:
                 import sys
                 sys.print_exception(e)
-            await conn.reply(frame, "HTTP/1.1 500 Internal Server Error\r\n\r\n", eof=True)
+            response = HTTPResponse.text_response(500, "Internal Server Error")
+            await conn.reply(frame, response, eof=True)
+
 
 # Global PageKite handler instance
 _pagekite_handler = None

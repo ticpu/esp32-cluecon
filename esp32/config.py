@@ -55,4 +55,4 @@ STATUS_COLORS = {
 
 # Device Configuration
 DEVICE_ID = "esp32-clucon-001"
-DEVICE_NAME = "ESP32 Sentiment Monitor"
+DEVICE_NAME = "ESP32-AI-Controller"

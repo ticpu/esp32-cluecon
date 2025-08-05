@@ -4,7 +4,7 @@
 # OpenAI Configuration
 OPENAI_API_KEY = "your-openai-api-key-here"
 
-# PageKite Configuration  
+# PageKite Configuration
 PAGEKITE_SECRET = "your-pagekite-secret-here"
 
 # SignalWire Configuration (for Phase 2)
