@@ -44,6 +44,16 @@ class SignalWireHooks:
                     },
                     {
                         "ai": {
+                            "languages": [
+                                {
+                                    "name": "English",
+                                    "code": "en-US",
+                                    "voice": "openai.alloy"
+                                }
+                            ],
+                            "params": {
+                                "ai_model": "gpt-4o-mini"
+                            },
                             "prompt": {
                                 "text": f"""You are connected to an ESP32 device called '{config.DEVICE_NAME}' for real-time monitoring and control.
 
@@ -61,13 +71,7 @@ Sensor details:
 - Light readings: Phone LED ~74%, conference room ~34%, covered ~10%
 
 You can check environmental conditions, system status, and control the device LED colors. Be helpful and provide natural responses about the sensor data with specific numbers.""",
-                                "temperature": 0.7,
-                                "max_tokens": 256
-                            },
-                            "post_prompt": "Summarize the conversation and any sensor readings or device interactions.",
-                            "post_prompt_url": f"https://{config.PAGEKITE_DOMAIN}/swaig/hangup_hook",
-                            "params": {
-                                "model": "gpt-4o-mini"
+                                "temperature": 0.7
                             },
                             "SWAIG": {
                                 "functions": self._get_swaig_functions()
@@ -92,8 +96,7 @@ You can check environmental conditions, system status, and control the device LE
                 },
                 "parameters": {
                     "type": "object",
-                    "properties": {},
-                    "required": []
+                    "properties": {}
                 }
             },
             {
@@ -105,8 +108,7 @@ You can check environmental conditions, system status, and control the device LE
                 },
                 "parameters": {
                     "type": "object",
-                    "properties": {},
-                    "required": []
+                    "properties": {}
                 }
             },
             {
@@ -118,8 +120,7 @@ You can check environmental conditions, system status, and control the device LE
                 },
                 "parameters": {
                     "type": "object",
-                    "properties": {},
-                    "required": []
+                    "properties": {}
                 }
             },
             {
@@ -131,8 +132,7 @@ You can check environmental conditions, system status, and control the device LE
                 },
                 "parameters": {
                     "type": "object",
-                    "properties": {},
-                    "required": []
+                    "properties": {}
                 }
             },
             {
