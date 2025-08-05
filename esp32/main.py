@@ -52,6 +52,7 @@ class WordBuffer:
         self.max_words = max_words
         self.trim_words = trim_words
         self.last_update = 0
+        self.processed_count = 0  # Track how many words have been processed
 
     def add_words(self, text):
         """Add words to buffer, trimming if needed"""
@@ -71,13 +72,19 @@ class WordBuffer:
         return " ".join(self.buffer)
 
     def should_process(self, timeout_ms=2000):
-        """Check if we should process (2 seconds since last update)"""
-        return time.ticks_diff(time.ticks_ms(), self.last_update) >= timeout_ms
+        """Check if we should process (2 seconds since last update AND new words)"""
+        return (time.ticks_diff(time.ticks_ms(), self.last_update) >= timeout_ms and 
+                len(self.buffer) > self.processed_count)
 
     def clear(self):
         """Clear the buffer"""
         while self.buffer:
             self.buffer.popleft()
+        self.processed_count = 0
+    
+    def mark_processed(self):
+        """Mark current buffer contents as processed"""
+        self.processed_count = len(self.buffer)
 
 # OpenAI API Client
 class SentimentAnalyzer:
@@ -275,8 +282,8 @@ class WebhookServer:
                     # Update LEDs
                     self.led_controller.set_level(level)
 
-                    # Clear buffer after processing
-                    self.word_buffer.clear()
+                    # Mark current content as processed
+                    self.word_buffer.mark_processed()
 
                     # Force garbage collection
                     gc.collect()
