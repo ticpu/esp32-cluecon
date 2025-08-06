@@ -162,12 +162,10 @@ class DeviceSensors:
         """Get ESP32 internal core temperature"""
         try:
             # ESP32 internal temperature sensor (if available)
-            from esp32 import raw_temperature
-            temp_f = raw_temperature()
-            temp_c = (temp_f - 32) * 5/9
+            from esp32 import mcu_temperature
+            temp_c = mcu_temperature()
             return {
                 "celsius": round(temp_c, 1),
-                "fahrenheit": round(temp_f, 1),
                 "source": "esp32_core"
             }
         except Exception as e:
@@ -175,7 +173,6 @@ class DeviceSensors:
             print("Exception: %s", e)
             return {
                 "celsius": 42.0,
-                "fahrenheit": 107.6,
                 "source": "mock_core"
             }
 

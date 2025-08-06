@@ -60,7 +60,7 @@ Available capabilities:
 - Visual feedback through LED display based on conversation emotion
 
 Sensor details:
-- DHT11 temperature/humidity sensor: Provides accurate room temperature (°C/°F) and humidity percentage
+- DHT11 temperature/humidity sensor: Provides accurate room temperature and humidity percentage
 - Photoresistor light sensor: Reports light levels as percentage (>30% = bright, 20-30% = moderate lighting, <20% = dim)
 
 IMPORTANT INSTRUCTIONS:
@@ -261,7 +261,7 @@ You can check environmental conditions, system status, and control the device LE
         response_text = (
             f"ESP32 system status: "
             f"Uptime {uptime_data['formatted']}, "
-            f"core temperature {core_temp['celsius']}°C ({core_temp['fahrenheit']}°F), "
+            f"core temperature {core_temp['celsius']}C, "
             f"memory {memory_data['used_kb']}kB used, {memory_data['total_kb']}kB total."
         )
 
