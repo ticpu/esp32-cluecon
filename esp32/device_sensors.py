@@ -12,6 +12,10 @@ class DeviceSensors:
     def __init__(self):
         self.start_time = time.ticks_ms()
 
+        # Initialize bar graph LEDs for pending operations (pins 9-13)
+        self.bar_pins = [Pin(9, Pin.OUT), Pin(10, Pin.OUT), Pin(11, Pin.OUT), Pin(12, Pin.OUT), Pin(13, Pin.OUT)]
+        self.clear_pending_operations_bar()
+
         # Initialize light sensor (photoresistor voltage divider)
         # Pin 7 (3.3V) -> Photoresistor -> Pin 15 (ADC) -> 1kΩ resistor -> Ground
         try:
@@ -269,3 +273,24 @@ class DeviceSensors:
             "uptime": self.get_uptime(),
             "memory": self.get_memory_info()
         }
+
+    def set_pending_operations_bar(self, pending_count):
+        """Set bar graph LEDs based on pending operations count"""
+        if pending_count <= 0:
+            self.clear_pending_operations_bar()
+        else:
+            # Light up LEDs up to min(pending_count, 5)
+            leds_to_light = min(pending_count, 5)
+            for i in range(5):
+                if i < leds_to_light:
+                    self.bar_pins[i].on()
+                else:
+                    self.bar_pins[i].off()
+
+        if config.DEBUG:
+            print(f"Bar graph set to {min(pending_count, 5)}/5 LEDs for {pending_count} pending operations")
+
+    def clear_pending_operations_bar(self):
+        """Clear all bar graph LEDs"""
+        for pin in self.bar_pins:
+            pin.off()

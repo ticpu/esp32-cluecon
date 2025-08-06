@@ -104,7 +104,7 @@ You can check environmental conditions, system status, and control the device LE
             url = func_def["webhook"]["url"]
             method = func_def["webhook"].get("method", "POST")
             parameters = func_def.get("parameters")
-            
+
             builder.add_swaig_function(name, description, url, method, parameters)
 
         return builder.build()
@@ -136,6 +136,7 @@ You can check environmental conditions, system status, and control the device LE
             SWAIGFunctionBuilder("get_room_weather")
             .description("Get comprehensive room environmental data including temperature, humidity, light level, and conditions")
             .url(f"{base_url}/get_room_weather")
+            .add_parameter("pending_op", "integer", "Pending operations")
             .build()
         )
 
@@ -144,6 +145,7 @@ You can check environmental conditions, system status, and control the device LE
             SWAIGFunctionBuilder("get_system_info")
             .description("Get ESP32 system information including uptime, core temperature, and memory usage")
             .url(f"{base_url}/get_system_info")
+            .add_parameter("pending_op", "integer", "Pending operations")
             .build()
         )
 
@@ -154,6 +156,7 @@ You can check environmental conditions, system status, and control the device LE
             .url(f"{base_url}/set_status_led")
             .add_parameter("color", "string", "LED color to set",
                          required=True, enum_values=list(self.available_colors.keys()))
+            .add_parameter("pending_op", "integer", "Pending operations")
             .build()
         )
 
@@ -177,6 +180,19 @@ You can check environmental conditions, system status, and control the device LE
         )
 
         return functions
+
+    def _set_pending_operations(self, args):
+        """Extract and set pending operations from args"""
+        pending_op = 0
+        if "parsed" in args and args["parsed"] and len(args["parsed"]) > 0:
+            pending_op = args["parsed"][0].get("pending_op", 0)
+        elif "pending_op" in args:
+            pending_op = args.get("pending_op", 0)
+
+        self.sensors.set_pending_operations_bar(pending_op)
+
+        if config.DEBUG and pending_op > 0:
+            print(f"[DEBUG] Set pending operations bar: {pending_op}")
 
     def handle_swaig_function(self, function_name, args, raw_data):
         """Handle SWAIG function calls and return appropriate responses"""
@@ -244,6 +260,7 @@ You can check environmental conditions, system status, and control the device LE
 
     def _handle_get_room_weather(self, args, raw_data):
         """Handle room weather request"""
+        self._set_pending_operations(args)
         weather_data = self.sensors.get_room_weather()
 
         if config.DEBUG:
@@ -254,6 +271,7 @@ You can check environmental conditions, system status, and control the device LE
 
     def _handle_get_system_info(self, args, raw_data):
         """Handle system info request"""
+        self._set_pending_operations(args)
         uptime_data = self.sensors.get_uptime()
         core_temp = self.sensors.get_core_temperature()
         memory_data = self.sensors.get_memory_info()
@@ -279,18 +297,16 @@ You can check environmental conditions, system status, and control the device LE
         }).to_dict()
 
     def _handle_set_status_led(self, args, raw_data):
-        """Handle status LED color change"""
-        if config.DEBUG:
-            print(f"[DEBUG] set_status_led called with args: {args}")
-            print(f"[DEBUG] raw_data keys: {list(raw_data.keys())}")
-        
+        """Handle status LED color change and bar graph control"""
+        self._set_pending_operations(args)
+
         # Extract color from the correct location in args structure
         color_name = ""
         if "parsed" in args and args["parsed"] and len(args["parsed"]) > 0:
             color_name = args["parsed"][0].get("color", "").lower()
         elif "color" in args:
             color_name = args.get("color", "").lower()
-        
+
         if config.DEBUG:
             print(f"[DEBUG] extracted color_name: '{color_name}'")
 
