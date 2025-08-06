@@ -32,8 +32,8 @@ CALLBACK_PATH = "/webhook"
 RESET_PATH = "/reset"  # Endpoint to reset buffer (for call disconnect)
 
 # Debug webhook settings for SWAIG response logging
-DEBUG_WEBHOOK_LEVEL = 2   # 0=disabled, 1=basic info, 2=verbose info
-AUDIBLE_DEBUG = True     # Announce function execution on call
+DEBUG_WEBHOOK_LEVEL = 0   # 0=disabled, 1=basic info, 2=verbose info
+AUDIBLE_DEBUG = False     # Announce function execution on call
 VERBOSE_LOGS = True      # Enable verbose logging
 CACHE_MODE = False        # Enable response caching
 ENABLE_ACCOUNTING = False # Enable usage accounting

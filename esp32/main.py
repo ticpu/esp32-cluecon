@@ -15,6 +15,117 @@ from signalwire_hooks import SignalWireHooks
 from http_utils import HTTPResponse, HTTPRequest, HTTPRequestHandler
 from sentiment_analyzer import SentimentAnalyzer
 
+# Fragment Assembler for handling PageKite request fragmentation
+class FragmentAssembler:
+    def __init__(self):
+        self.fragment_buffer = {}  # Track fragments by connection
+        self.timeout_ms = 2000     # 2 second timeout for fragments
+        
+    def is_fragment(self, request_str):
+        """Detect if this looks like a fragment by checking if it's a valid HTTP request"""
+        if not request_str or len(request_str.strip()) == 0:
+            return False
+            
+        # A valid HTTP request must:
+        # 1. Start with HTTP method
+        # 2. Have proper HTTP version
+        # 3. Have complete headers ending with \r\n\r\n or \n\n
+        
+        if not self.is_valid_http_request(request_str):
+            # Not a valid HTTP request = fragment
+            first_line = request_str.split('\n')[0].strip()
+            if config.DEBUG:
+                print(f"Fragment detected: {first_line[:50]}...")
+            return True
+            
+        return False
+    
+    def is_valid_http_request(self, request_str):
+        """Check if this is a complete, valid HTTP request"""
+        lines = request_str.split('\n')
+        if not lines:
+            return False
+            
+        # Check first line: METHOD /path HTTP/version
+        first_line = lines[0].strip()
+        parts = first_line.split()
+        
+        if len(parts) != 3:
+            return False
+            
+        method, path, version = parts
+        
+        # Valid HTTP methods
+        http_methods = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS', 'PATCH']
+        if method not in http_methods:
+            return False
+            
+        # Valid HTTP version
+        if not version.startswith('HTTP/'):
+            return False
+            
+        # Must have path starting with /
+        if not path.startswith('/'):
+            return False
+            
+        # Check for end of headers
+        has_header_end = '\r\n\r\n' in request_str or '\n\n' in request_str
+        if not has_header_end:
+            return False
+            
+        return True
+    
+        
+    def add_fragment(self, connection_id, fragment):
+        """Add fragment to buffer for connection"""
+        if connection_id not in self.fragment_buffer:
+            self.fragment_buffer[connection_id] = {
+                'fragments': [],
+                'timestamp': time.ticks_ms()
+            }
+        
+        self.fragment_buffer[connection_id]['fragments'].append(fragment)
+        if config.DEBUG:
+            print(f"Added fragment for connection {connection_id}: {len(self.fragment_buffer[connection_id]['fragments'])} total")
+    
+    def assemble_with_fragments(self, connection_id, current_request):
+        """Assemble current request with any buffered fragments"""
+        if connection_id not in self.fragment_buffer:
+            return current_request
+            
+        fragments = self.fragment_buffer[connection_id]['fragments']
+        if not fragments:
+            return current_request
+            
+        # Assemble: current_request + all fragments  
+        assembled = current_request
+        for fragment in fragments:
+            assembled += fragment
+            
+        if config.DEBUG:
+            print(f"Assembled request from {len(fragments)} fragments: {len(assembled)} total chars")
+            
+        return assembled
+    
+    def clear_fragments(self, connection_id):
+        """Clear fragments for connection"""
+        if connection_id in self.fragment_buffer:
+            del self.fragment_buffer[connection_id]
+    
+    def cleanup_expired_fragments(self):
+        """Remove expired fragments to prevent memory leaks"""
+        current_time = time.ticks_ms()
+        expired_connections = []
+        
+        for conn_id, data in self.fragment_buffer.items():
+            if time.ticks_diff(current_time, data['timestamp']) > self.timeout_ms:
+                expired_connections.append(conn_id)
+        
+        for conn_id in expired_connections:
+            if config.DEBUG:
+                print(f"Cleaning up expired fragments for connection {conn_id}")
+            del self.fragment_buffer[conn_id]
+
 # NeoPixel Status Indicator
 class StatusIndicator:
     def __init__(self, pin=config.NEOPIXEL_PIN, count=config.NEOPIXEL_COUNT):
@@ -100,13 +211,99 @@ class WebhookServer:
         self.processing = False
         # Initialize SignalWire hooks integration
         self.signalwire_hooks = SignalWireHooks(status_indicator, led_controller, word_buffer)
+        # Initialize fragment assembler for handling PageKite fragmentation
+        self.fragment_assembler = FragmentAssembler()
+
+    async def read_complete_http_request(self, reader):
+        """Read complete HTTP request handling Content-Length properly"""
+        try:
+            # Read headers line by line until we get the complete header
+            headers_data = b""
+            
+            while True:
+                line = await reader.readline()
+                if not line:  # EOF
+                    break
+                headers_data += line
+                
+                # Check for end of headers
+                if headers_data.endswith(b'\r\n\r\n'):
+                    break
+                elif headers_data.endswith(b'\n\n'):  # Handle \n\n case
+                    break
+            
+            if config.DEBUG:
+                print(f"Headers received: {len(headers_data)} bytes")
+            
+            # Parse Content-Length from headers
+            headers_str = headers_data.decode('utf-8', errors='ignore')
+            content_length = 0
+            
+            for line in headers_str.split('\n'):
+                line = line.strip()
+                if line.lower().startswith('content-length:'):
+                    try:
+                        content_length = int(line.split(':', 1)[1].strip())
+                        break
+                    except (ValueError, IndexError):
+                        if config.DEBUG:
+                            print(f"Failed to parse Content-Length: {line}")
+                        continue
+            
+            if config.DEBUG:
+                print(f"Content-Length: {content_length}")
+            
+            # Read exact body length if present
+            body_data = b""
+            if content_length > 0:
+                body_data = await reader.readexactly(content_length)
+                if config.DEBUG:
+                    print(f"Body received: {len(body_data)} bytes")
+            
+            # Combine headers and body
+            complete_request = headers_data + body_data
+            return complete_request.decode('utf-8', errors='ignore')
+            
+        except Exception as e:
+            if config.DEBUG:
+                print(f"Error reading HTTP request: {e}")
+            return ""
 
     async def handle_request(self, reader, writer):
-        """Handle incoming HTTP requests"""
+        """Handle incoming HTTP requests with fragment assembly"""
         try:
-            # Simple approach - read larger buffer but don't over-read
-            request = await reader.read(8192)
-            request_str = request.decode('utf-8')
+            if config.DEBUG:
+                print("=== NEW HTTP REQUEST ===")
+            
+            # Read complete HTTP request with proper Content-Length handling
+            request_str = await self.read_complete_http_request(reader)
+            
+            if not request_str:
+                if config.DEBUG:
+                    print("ERROR: Empty request received")
+                return
+            
+            # Generate connection ID from writer object (unique per connection)
+            connection_id = id(writer)
+            
+            # Check if this is a fragment
+            if self.fragment_assembler.is_fragment(request_str):
+                if config.DEBUG:
+                    print(f"Fragment detected, buffering for connection {connection_id}")
+                
+                # Buffer the fragment and wait for complete request
+                self.fragment_assembler.add_fragment(connection_id, request_str)
+                
+                # Send a simple response to fragment request to avoid errors
+                await self.send_response(writer, 200, "Fragment received")
+                return
+            
+            # This is a complete request - assemble with any fragments
+            assembled_request = self.fragment_assembler.assemble_with_fragments(connection_id, request_str)
+            self.fragment_assembler.clear_fragments(connection_id)
+            
+            # Use the assembled request for processing
+            request_str = assembled_request
 
             if config.DEBUG:
                 print(f"Request: {request_str[:200]}...")
@@ -171,6 +368,10 @@ class WebhookServer:
                                 print(f"Body content (first 200 chars): {repr(body[:200])}")
                                 print(f"Body length: {len(body)}")
                                 print(f"Raw request (first 500 chars): {repr(request_str[:500])}")
+                                print(f"Request method: {method}, path: {path}")
+                                print("=== COMPLETE REQUEST DUMP ===")
+                                print(repr(request_str))
+                                print("=== END REQUEST DUMP ===")
                             raise json_error
 
                     function_name = path.split("/")[-1]  # Extract function name from path
@@ -330,10 +531,18 @@ async def main():
     # Set status to idle (green) when server is ready
     status_indicator.set_status('idle')
 
-    # Keep server running
+    # Keep server running with periodic cleanup
+    cleanup_counter = 0
     while True:
         await asyncio.sleep(1)
         gc.collect()  # Regular garbage collection
+        
+        # Cleanup expired fragments every 30 seconds
+        cleanup_counter += 1
+        if cleanup_counter >= 30:
+            if hasattr(webhook_server, 'fragment_assembler'):
+                webhook_server.fragment_assembler.cleanup_expired_fragments()
+            cleanup_counter = 0
 
 # Run the application
 if __name__ == "__main__":
