@@ -170,8 +170,9 @@ class DeviceSensors:
                 "fahrenheit": round(temp_f, 1),
                 "source": "esp32_core"
             }
-        except:
+        except Exception as e:
             # Fallback mock reading
+            print("Exception: %s", e)
             return {
                 "celsius": 42.0,
                 "fahrenheit": 107.6,
@@ -208,8 +209,9 @@ class DeviceSensors:
             "free_bytes": free_memory,
             "allocated_bytes": allocated_memory,
             "total_bytes": total_memory,
-            "free_percent": round((free_memory / total_memory) * 100, 1),
-            "used_percent": round((allocated_memory / total_memory) * 100, 1)
+            "free_kb": round(free_memory / 1024, 1),
+            "used_kb": round(allocated_memory / 1024, 1),
+            "total_kb": round(total_memory / 1024, 1)
         }
 
     def get_room_weather(self):

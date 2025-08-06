@@ -262,7 +262,7 @@ You can check environmental conditions, system status, and control the device LE
             f"ESP32 system status: "
             f"Uptime {uptime_data['formatted']}, "
             f"core temperature {core_temp['celsius']}°C ({core_temp['fahrenheit']}°F), "
-            f"memory usage {memory_data['used_percent']}% with {memory_data['free_bytes']} bytes free."
+            f"memory {memory_data['used_kb']}kB used, {memory_data['total_kb']}kB total."
         )
 
         if config.DEBUG:

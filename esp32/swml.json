@@ -1,0 +1,108 @@
+{
+  "sections": {
+    "main": [
+      {
+        "answer": {
+        }
+      },
+      {
+        "ai": {
+          "params": {
+            "verbose_logs": "false"
+          },
+          "hints": [
+            "temperature",
+            "humidity",
+            "light",
+            "system status",
+            "LED color"
+          ],
+          "languages": [
+            {
+              "code": "en-US",
+              "voice": "echo",
+              "name": "English",
+              "fillers": [
+                "One moment",
+                "Let me check that for you"
+              ],
+              "engine": "openai"
+            }
+          ],
+          "SWAIG": {
+            "defaults": {
+            },
+            "functions": [
+              {
+                "purpose": "Clean up ESP32 state after call ends.",
+                "function": "hangup_hook",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                  }
+                },
+                "web_hook_url": "https://tiky8192.pagekite.me/swaig/hangup_hook"
+              },
+              {
+                "purpose": "Get comprehensive room environmental data including temperature, humidity, light level, and conditions.",
+                "function": "get_room_weather",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                  }
+                },
+                "web_hook_url": "https://tiky8192.pagekite.me/swaig/get_room_weather"
+              },
+              {
+                "purpose": "Get ESP32 system information including uptime, core temperature, and memory usage.",
+                "function": "get_system_info",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                  }
+                },
+                "web_hook_url": "https://tiky8192.pagekite.me/swaig/get_system_info"
+              },
+              {
+                "purpose": "Control the status LED color. Available colors: lime, blue, yellow, white, orange, pink, off, red, green, purple, cyan.",
+                "function": "set_status_led",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                    "color": {
+                      "type": "string",
+                      "enum": [
+                        "lime",
+                        "blue",
+                        "yellow",
+                        "white",
+                        "orange",
+                        "pink",
+                        "off",
+                        "red",
+                        "green",
+                        "purple",
+                        "cyan"
+                      ],
+                      "description": "LED color to set."
+                    }
+                  },
+                  "required": [
+                    "color"
+                  ]
+                },
+                "web_hook_url": "https://tiky8192.pagekite.me/swaig/set_status_led"
+              }
+            ]
+          },
+          "prompt": {
+            "text": "You are the digital assistant for an ESP32 Monitor device. Greet the user, explain you can monitor room sensors (temperature, humidity, light), check system status (uptime, core temperature), control the LED.  Summarize sensor data. Do not ask for confirmation before executing any command. For uptime reading, do not include the 0 fields.",
+            "temperature": 0.7,
+            "top_p": 0.7
+          }
+        }
+      }
+    ]
+  },
+  "version": "1.0.0"
+}
