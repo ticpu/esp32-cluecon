@@ -249,10 +249,8 @@ You can check environmental conditions, system status, and control the device LE
         if config.DEBUG:
             print(f"Room weather requested: {weather_data['summary']}")
 
-        return SwaigFunctionResult(weather_data["summary"]).update_global_data({
-            "last_sensor_reading": weather_data,
-            "sensor_timestamp": "now"
-        }).to_dict()
+        # Simplify response to reduce payload size
+        return SwaigFunctionResult(weather_data["summary"]).to_dict()
 
     def _handle_get_system_info(self, args, raw_data):
         """Handle system info request"""

@@ -104,12 +104,47 @@ class WebhookServer:
     async def handle_request(self, reader, writer):
         """Handle incoming HTTP requests"""
         try:
-            # Read request
-            request = await reader.read(1024)
-            request_str = request.decode('utf-8')
+            # Read complete HTTP request with proper handling of Content-Length
+            request_data = b""
+            header_complete = False
+            content_length = 0
+            
+            # Read until we have complete headers
+            while not header_complete:
+                chunk = await reader.read(1024)
+                if not chunk:
+                    break
+                request_data += chunk
+                
+                # Check for end of headers
+                if b"\r\n\r\n" in request_data:
+                    header_complete = True
+                    # Parse Content-Length from headers
+                    headers_str = request_data.decode('utf-8', errors='ignore')
+                    for line in headers_str.split('\n'):
+                        if line.lower().startswith('content-length:'):
+                            content_length = int(line.split(':', 1)[1].strip())
+                            break
+                elif b"\n\n" in request_data:
+                    header_complete = True
+            
+            # Read remaining body data if needed
+            if content_length > 0:
+                body_separator = b"\r\n\r\n" if b"\r\n\r\n" in request_data else b"\n\n"
+                current_body_len = len(request_data.split(body_separator, 1)[1]) if body_separator in request_data else 0
+                
+                while current_body_len < content_length:
+                    chunk = await reader.read(min(1024, content_length - current_body_len))
+                    if not chunk:
+                        break
+                    request_data += chunk
+                    current_body_len += len(chunk)
+            
+            request_str = request_data.decode('utf-8', errors='ignore')
 
             if config.DEBUG:
                 print(f"Request: {request_str[:200]}...")
+                print(f"Full request length: {len(request_str)}")
 
             # Parse request
             lines = request_str.split('\n')
@@ -155,10 +190,22 @@ class WebhookServer:
                         body = request_str.split("\r\n\r\n", 1)[1]
                     elif "\n\n" in request_str:
                         body = request_str.split("\n\n", 1)[1]
+                    
+                    if config.DEBUG:
+                        print(f"SWAIG body length: {len(body)}")
+                        print(f"SWAIG body preview: {body[:100]}...")
 
                     swaig_data = {}
                     if body:
-                        swaig_data = json.loads(body)
+                        try:
+                            swaig_data = json.loads(body)
+                        except Exception as json_error:
+                            if config.DEBUG:
+                                print(f"JSON parse error: {json_error}")
+                                print(f"Body content (first 200 chars): {repr(body[:200])}")
+                                print(f"Body length: {len(body)}")
+                                print(f"Raw request (first 500 chars): {repr(request_str[:500])}")
+                            raise json_error
 
                     function_name = path.split("/")[-1]  # Extract function name from path
                     args = swaig_data.get("argument", {})
@@ -166,12 +213,17 @@ class WebhookServer:
 
                     # Use SignalWire hooks module to handle the function call
                     response_data = self.signalwire_hooks.handle_swaig_function(function_name, args, raw_data)
+                    
+                    # Convert to JSON string
+                    json_response = json.dumps(response_data)
+                    if config.DEBUG:
+                        print(f"SWAIG response size: {len(json_response)} bytes")
 
                     # Start processing task if text was added to buffer
                     if function_name == "process_text" and not self.processing:
                         asyncio.create_task(self.process_buffer())
 
-                    await self.send_response(writer, 200, json.dumps(response_data), "application/json")
+                    await self.send_response(writer, 200, json_response, "application/json")
 
                 except Exception as e:
                     if config.DEBUG:
@@ -217,7 +269,11 @@ class WebhookServer:
             await self.send_response(writer, 500, "Internal Server Error")
 
         finally:
-            await writer.aclose()
+            try:
+                await writer.aclose()
+            except Exception as close_error:
+                if config.DEBUG:
+                    print(f"Error closing connection: {close_error}")
 
     async def send_response(self, writer, status, body, content_type="text/plain"):
         """Send HTTP response"""
