@@ -245,8 +245,8 @@ class DeviceSensors:
         light_percent = light_data["percent"]
         if light_percent > 30:
             light_desc = "bright"
-        elif light_percent > 20:
-            light_desc = "moderate lighting"
+        elif light_percent > 15:
+            light_desc = "moderately bright"
         else:
             light_desc = "dim"
 
@@ -256,7 +256,7 @@ class DeviceSensors:
             "light_data": light_data,
             "weather_description": weather_desc,
             "lighting_description": light_desc,
-            "summary": f"The room is {weather_desc} with {light_desc}. Temperature is {temp_data['celsius']}°C ({temp_data['fahrenheit']}°F), humidity at {humidity if humidity is not None else 'N/A'}%, and light level at {light_percent}% ({light_data['voltage']}V from photoresistor)."
+            "summary": f"The room is {weather_desc} and {light_desc}. Temperature is {temp_data['celsius']}°C ({temp_data['fahrenheit']}°F), humidity at {humidity if humidity is not None else 'N/A'}%, and light level at {light_percent}% ({light_data['voltage']}V from photoresistor)."
         }
 
     def get_all_sensor_data(self):
