@@ -104,43 +104,9 @@ class WebhookServer:
     async def handle_request(self, reader, writer):
         """Handle incoming HTTP requests"""
         try:
-            # Read complete HTTP request with proper handling of Content-Length
-            request_data = b""
-            header_complete = False
-            content_length = 0
-            
-            # Read until we have complete headers
-            while not header_complete:
-                chunk = await reader.read(1024)
-                if not chunk:
-                    break
-                request_data += chunk
-                
-                # Check for end of headers
-                if b"\r\n\r\n" in request_data:
-                    header_complete = True
-                    # Parse Content-Length from headers
-                    headers_str = request_data.decode('utf-8', errors='ignore')
-                    for line in headers_str.split('\n'):
-                        if line.lower().startswith('content-length:'):
-                            content_length = int(line.split(':', 1)[1].strip())
-                            break
-                elif b"\n\n" in request_data:
-                    header_complete = True
-            
-            # Read remaining body data if needed
-            if content_length > 0:
-                body_separator = b"\r\n\r\n" if b"\r\n\r\n" in request_data else b"\n\n"
-                current_body_len = len(request_data.split(body_separator, 1)[1]) if body_separator in request_data else 0
-                
-                while current_body_len < content_length:
-                    chunk = await reader.read(min(1024, content_length - current_body_len))
-                    if not chunk:
-                        break
-                    request_data += chunk
-                    current_body_len += len(chunk)
-            
-            request_str = request_data.decode('utf-8', errors='ignore')
+            # Simple approach - read larger buffer but don't over-read
+            request = await reader.read(8192)
+            request_str = request.decode('utf-8')
 
             if config.DEBUG:
                 print(f"Request: {request_str[:200]}...")
@@ -276,12 +242,13 @@ class WebhookServer:
                     print(f"Error closing connection: {close_error}")
 
     async def send_response(self, writer, status, body, content_type="text/plain"):
-        """Send HTTP response"""
+        """Send HTTP response with explicit connection closure"""
         status_text = {200: "OK", 400: "Bad Request", 404: "Not Found", 500: "Internal Server Error"}
         response = f"HTTP/1.1 {status} {status_text.get(status, 'Unknown')}\r\n"
         response += f"Content-Type: {content_type}\r\n"
         response += f"Content-Length: {len(body)}\r\n"
-        response += "Connection: close\r\n\r\n"
+        response += "Connection: close\r\n"
+        response += "Cache-Control: no-cache\r\n\r\n"
         response += body
 
         writer.write(response.encode())

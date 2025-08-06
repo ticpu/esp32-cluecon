@@ -280,7 +280,19 @@ You can check environmental conditions, system status, and control the device LE
 
     def _handle_set_status_led(self, args, raw_data):
         """Handle status LED color change"""
-        color_name = args.get("color", "").lower()
+        if config.DEBUG:
+            print(f"[DEBUG] set_status_led called with args: {args}")
+            print(f"[DEBUG] raw_data keys: {list(raw_data.keys())}")
+        
+        # Extract color from the correct location in args structure
+        color_name = ""
+        if "parsed" in args and args["parsed"] and len(args["parsed"]) > 0:
+            color_name = args["parsed"][0].get("color", "").lower()
+        elif "color" in args:
+            color_name = args.get("color", "").lower()
+        
+        if config.DEBUG:
+            print(f"[DEBUG] extracted color_name: '{color_name}'")
 
         if color_name not in self.available_colors:
             available = ", ".join(self.available_colors.keys())
